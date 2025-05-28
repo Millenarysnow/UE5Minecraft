@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ChunkBase.h"
 #include "ChunkMeshData.h"
 #include "GameFramework/Actor.h"
 #include "GreedyChunk.generated.h"
@@ -8,9 +9,10 @@
 class FastNoiseLite;
 class UProceduralMeshComponent;
 enum class EBlock;
+enum class EDirection;
 
 UCLASS()
-class AGreedyChunk : public AActor
+class AGreedyChunk : public AChunkBase
 {
 	GENERATED_BODY()
 
@@ -24,26 +26,20 @@ class AGreedyChunk : public AActor
 public:	
 	AGreedyChunk();
 
+	/*
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	FIntVector Size = FIntVector(1, 1, 1) * 32;
+	*/
 	
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void GenerateHeightMap() override;
+
+	virtual void GenerateMesh() override;
+
 private:
-	TObjectPtr<UProceduralMeshComponent> Mesh;
-	TObjectPtr<FastNoiseLite> Noise;
-
-	FChunkMeshData MeshData;
 	TArray<EBlock> Blocks;
-
-	int VertexCount = 0;
-
-	void GenerateBlocks();
-
-	void ApplyMesh();
-
-	void GenerateMesh();
 
 	void CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
 

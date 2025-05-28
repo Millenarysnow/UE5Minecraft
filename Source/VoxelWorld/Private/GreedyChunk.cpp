@@ -6,42 +6,24 @@
 
 AGreedyChunk::AGreedyChunk()
 {
-	PrimaryActorTick.bCanEverTick = false;
-
-	Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
-	Noise = new FastNoiseLite();
-	Noise->SetFrequency(0.03f);
-	Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
-
 	// 初始化 Blocks
-	Blocks.SetNum(Size.X * Size.Y * Size.Z);
-
-	// Mesh 设置
-	Mesh->SetCastShadow(false);
-	SetRootComponent(Mesh);
+	Blocks.SetNum(Size * Size * Size);
 }
 
 void AGreedyChunk::BeginPlay()
 {
 	Super::BeginPlay();
-
-	GenerateBlocks();
-
-	GenerateMesh();
-
-	ApplyMesh();
 }
 
-void AGreedyChunk::GenerateBlocks()
+void AGreedyChunk::GenerateHeightMap()
 {
 		const auto Location = GetActorLocation();
     
     	// 使用噪声生成高度图
     	// x与y只是简单遍历
-    	for (int x = 0; x < Size.X; x++)
+    	for (int x = 0; x < Size; x++)
     	{
-    		for (int y = 0; y < Size.Y; y++)
+    		for (int y = 0; y < Size; y++)
     		{
     			// 乘100因为单个方块大小为100
     			// 除以100是为了获取到一个整数
@@ -52,35 +34,21 @@ void AGreedyChunk::GenerateBlocks()
     			// (Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2 用于将这个数缩放至[0, Size]
     			// RoundToInt 将浮点数四舍五入为整数
     			// Clamp 将值限制在[0, Size]之间，实际上仅仅只是为了更安全
-    			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size.Z / 2), 0, Size.Z);
+    			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2), 0, Size);
     
     			// 下面为填充方块
     			
-    			for (int z = 0; z < Size.Z; z++)
+    			for (int z = 0; z < Height; z++)
     			{
     				Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
     			}
     
-    			for (int z = Height; z < Size.Z; z++)
+    			for (int z = Height; z < Size; z++)
     			{
     				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
     			}
     		}
     	}
-}
-
-void AGreedyChunk::ApplyMesh()
-{
-	Mesh->CreateMeshSection(
-		0,
-		MeshData.Vertices,
-		MeshData.Triangles,
-		MeshData.Normals,
-		MeshData.UVO,
-		TArray<FColor>(),
-		TArray<FProcMeshTangent>(),
-		false
-	);
 }
 
 void AGreedyChunk::GenerateMesh()
@@ -95,9 +63,9 @@ void AGreedyChunk::GenerateMesh()
 		const int Axis2 = (Axis + 2) % 3;
 
 		// 获取当前对应轴的限制范围
-		const int MainAxisLimit = Size[Axis];
-		int Axis1Limit = Size[Axis1];
-		int Axis2Limit = Size[Axis2];
+		const int MainAxisLimit = Size;
+		int Axis1Limit = Size;
+		int Axis2Limit = Size;
 
 		auto DeltaAxis1 = FIntVector::ZeroValue;
 		auto DeltaAxis2 = FIntVector::ZeroValue;
@@ -254,13 +222,13 @@ void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FI
 
 int AGreedyChunk::GetBlockIndex(int X, int Y, int Z) const
 {
-	return Z * Size.X * Size.Y + Y * Size.X + X;
+	return Z * Size * Size + Y * Size + X;
 }
 
 EBlock AGreedyChunk::GetBlock(FIntVector Index) const
 {
 	// 越界时返回 Air
-	if (Index.X < 0 || Index.Y < 0 || Index.Z < 0 || Index.X >= Size.X || Index.Y >= Size.Y || Index.Z >= Size.Z)
+	if (Index.X < 0 || Index.Y < 0 || Index.Z < 0 || Index.X >= Size || Index.Y >= Size || Index.Z >= Size)
 		return EBlock::Air;
 	
 	return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
