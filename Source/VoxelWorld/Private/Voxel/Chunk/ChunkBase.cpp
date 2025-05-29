@@ -73,7 +73,7 @@ void AChunkBase::ApplyMesh() const
 		MeshData.UVO,
 		MeshData.Colors,
 		TArray<FProcMeshTangent>(),
-		false
+		true
 	);
 }
 
