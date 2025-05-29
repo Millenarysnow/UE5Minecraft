@@ -2,14 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "ChunkBase.h"
-#include "ChunkMeshData.h"
-#include "GameFramework/Actor.h"
+#include "Voxel/Utils/Enums.h"
 #include "GreedyChunk.generated.h"
 
 class FastNoiseLite;
 class UProceduralMeshComponent;
-enum class EBlock;
-enum class EDirection;
 
 UCLASS()
 class AGreedyChunk : public AChunkBase
@@ -22,21 +19,14 @@ class AGreedyChunk : public AChunkBase
 		EBlock Block; // 方块类型
 		int Normal; // 法线方向
 	};
-	
-public:	
-	AGreedyChunk();
 
-	/*
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	FIntVector Size = FIntVector(1, 1, 1) * 32;
-	*/
-	
 protected:
-	virtual void BeginPlay() override;
-
-	virtual void GenerateHeightMap() override;
-
 	virtual void GenerateMesh() override;
+	virtual void Setup() override;
+	virtual void Generate2DHeightMap(const FVector Position) override;
+	virtual void Generate3DHeightMap(const FVector Position) override;
+
+	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) override;
 
 private:
 	TArray<EBlock> Blocks;

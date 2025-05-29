@@ -13,8 +13,6 @@ class AMarchingChunk : public AChunkBase
 	GENERATED_BODY()
 
 public:
-	AMarchingChunk();
-
 	UPROPERTY(EditDefaultsOnly, Category = "Marching Cubes")
 	float SurfaceLevel = 0.0f; // 区分内部或外部的阈值
 
@@ -22,8 +20,9 @@ public:
 	bool Interpolation = false; // 是否使用插值（平滑地形）
 
 protected:
-	virtual void GenerateHeightMap() override;
-	
+	virtual void Setup() override;
+	virtual void Generate2DHeightMap(const FVector Position) override;
+	virtual void Generate3DHeightMap(const FVector Position) override;
 	virtual void GenerateMesh() override;
 
 private:

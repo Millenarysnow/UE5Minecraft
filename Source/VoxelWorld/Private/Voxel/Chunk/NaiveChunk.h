@@ -1,45 +1,31 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "Chunk.generated.h"
+#include "ChunkBase.h"
+#include "Voxel/Utils/Enums.h"
+#include "NaiveChunk.generated.h"
 
 
-enum class EBlock;
-enum class EDirection;
 class FastNoiseLite;
 class UProceduralMeshComponent;
 
 
 UCLASS()
-class AChunk : public AActor
+class ANaiveChunk : public AChunkBase
 {
 	GENERATED_BODY()
-	
-public:	
-	AChunk();
 
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int Size = 32;
-
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int Scale = 1;
-	
 protected:
-	virtual void BeginPlay() override;
+	virtual void Setup() override;
+	virtual void Generate2DHeightMap(const FVector Position) override;
+	virtual void Generate3DHeightMap(const FVector Position) override;
+	virtual void GenerateMesh() override;
+
+	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) override;
 
 private:
-	TObjectPtr<UProceduralMeshComponent> Mesh;
-	TObjectPtr<FastNoiseLite> Noise;
-
 	TArray<EBlock> Blocks;
-
-	TArray<FVector> VertexData;
-	TArray<int> TriangleData;
-	TArray<FVector2D> UVData;
-
-	int VertexCount = 0; // 顶点计数
-
+	
 	// 立方体的顶点表
 	const FVector BlockVertexData[8] = {
 		FVector(100,100,100),
@@ -63,13 +49,7 @@ private:
 		5,4,1,0, // Up
 		3,2,7,6  // Down
 	};
-
-	void GenerateBlocks();
-
-	void GenerateMesh();
-
-	void ApplyMesh() const;
-
+	
 	// 检查给定位置是否为空气方块（即透明方块）
 	// 如果位置为透明方块，那么就需要绘制
 	// 在位置超过当前 Chunk 范围的情况下也会返回 True
@@ -84,4 +64,6 @@ private:
 	FVector GetPositionInDirection(EDirection Direction, FVector Position) const;
 
 	int GetBlockIndex(int X, int Y, int Z) const;
+	
+	FVector GetNormal(EDirection Direction);
 };

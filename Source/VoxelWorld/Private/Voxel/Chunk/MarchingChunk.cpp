@@ -3,9 +3,9 @@
 
 #include "MarchingChunk.h"
 
-#include "FastNoiseLite.h"
+#include "Voxel/Utils/FastNoiseLite.h"
 
-AMarchingChunk::AMarchingChunk()
+void AMarchingChunk::Setup()
 {
 	/*
 	 * 初始化时多初始化一个方块的原因是
@@ -18,12 +18,31 @@ AMarchingChunk::AMarchingChunk()
 	Voxels.SetNum((Size + 1) * (Size + 1) * (Size + 1));
 }
 
-void AMarchingChunk::GenerateHeightMap()
+void AMarchingChunk::Generate2DHeightMap(const FVector Position)
 {
-	// 与方块区块不同，这里生成三维高度地图
+	for (int x = 0; x <= Size; x++)
+	{
+		for (int y = 0; y <= Size; y++)
+		{
+			const float Xpos = x + Position.X;
+			const float Ypos = y + Position.Y;
 
-	const auto Position = GetActorLocation() / 100;
+			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2), 0, Size);
+			
+			for (int z = 0; z < Height; z++)
+			{
+				Voxels[GetVoxelIndex(x, y, z)] = 1.0f;
+			}
+			for (int z = Height; z < Size; z++)
+			{
+				Voxels[GetVoxelIndex(x, y, z)] = -1.0f;
+			}
+		}
+	}
+}
 
+void AMarchingChunk::Generate3DHeightMap(const FVector Position)
+{
 	for (int x = 0; x <= Size; x++)
 	{
 		for (int y = 0; y <= Size; y++)
@@ -134,6 +153,10 @@ void AMarchingChunk::March(int X, int Y, int Z, const float Cube[8])
 		MeshData.Normals.Add(Normal);
 		MeshData.Normals.Add(Normal);
 		MeshData.Normals.Add(Normal);
+
+		auto Color = FColor::MakeRandomColor();
+		
+		MeshData.Colors.Append({Color, Color, Color});
 
 		VertexCount += 3;
 	}

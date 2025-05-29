@@ -1,54 +1,71 @@
 #include "GreedyChunk.h"
 
-#include "Enums.h"
+#include "Voxel/Utils/Enums.h"
 #include "ProceduralMeshComponent.h"
-#include "FastNoiseLite.h"
+#include "Voxel/Utils/FastNoiseLite.h"
 
-AGreedyChunk::AGreedyChunk()
+void AGreedyChunk::Setup()
 {
-	// 初始化 Blocks
+	// 初始化方块数组
 	Blocks.SetNum(Size * Size * Size);
 }
 
-void AGreedyChunk::BeginPlay()
+void AGreedyChunk::Generate2DHeightMap(const FVector Position)
 {
-	Super::BeginPlay();
+	for (int x = 0; x < Size; x++)
+	{
+		for (int y = 0; y < Size; y++)
+		{
+			const float Xpos = x + Position.X;
+			const float Ypos = y + Position.Y;
+
+			// GetNoise返回一个[-1, 1]的数
+			// (Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2 用于将这个数缩放至[0, Size]
+			// RoundToInt 将浮点数四舍五入为整数
+			// Clamp 将值限制在[0, Size]之间，实际上仅仅只是为了更安全
+			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2), 0, Size);
+    
+			// 下面为填充方块
+			for (int z = 0; z < Height; z++)
+			{
+				Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
+			}
+			for (int z = Height; z < Size; z++)
+			{
+				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
+			}
+		}
+	}
 }
 
-void AGreedyChunk::GenerateHeightMap()
+void AGreedyChunk::Generate3DHeightMap(const FVector Position)
 {
-		const auto Location = GetActorLocation();
-    
-    	// 使用噪声生成高度图
-    	// x与y只是简单遍历
-    	for (int x = 0; x < Size; x++)
+    for (int x = 0; x < Size; x++)
+    {
+    	for (int y = 0; y < Size; y++)
     	{
-    		for (int y = 0; y < Size; y++)
+    		for (int z = 0; z < Size; z++)
     		{
-    			// 乘100因为单个方块大小为100
-    			// 除以100是为了获取到一个整数
-    			const float Xpos = (x * 100 + Location.X) / 100;
-    			const float Ypos = (y * 100 + Location.Y) / 100;
-    
-    			// GetNoise返回一个[-1, 1]的数
-    			// (Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2 用于将这个数缩放至[0, Size]
-    			// RoundToInt 将浮点数四舍五入为整数
-    			// Clamp 将值限制在[0, Size]之间，实际上仅仅只是为了更安全
-    			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2), 0, Size);
-    
-    			// 下面为填充方块
-    			
-    			for (int z = 0; z < Height; z++)
-    			{
-    				Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
-    			}
-    
-    			for (int z = Height; z < Size; z++)
+    			const auto NoiseValue = Noise->GetNoise(Position.X + x, Position.Y + y, Position.Z + z);
+
+    			if (NoiseValue >= 0)
     			{
     				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
     			}
+			    else
+			    {
+				    Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
+			    }
     		}
     	}
+    }
+}
+
+void AGreedyChunk::ModifyVoxelData(const FIntVector Position, EBlock Block)
+{
+	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
+
+	Blocks[Index] = Block;
 }
 
 void AGreedyChunk::GenerateMesh()
@@ -194,6 +211,7 @@ void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FI
 	FIntVector V4)
 {
 	const auto Normal = FVector(AxisMask * Mask.Normal);
+	const auto Color = FColor(96, 35,115, 225);
 
 	MeshData.Vertices.Add(FVector(V1) * 100);
 	MeshData.Vertices.Add(FVector(V2) * 100);
@@ -216,6 +234,8 @@ void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FI
 	MeshData.Normals.Add(Normal);
 	MeshData.Normals.Add(Normal);
 	MeshData.Normals.Add(Normal);
+
+	MeshData.Colors.Append({Color, Color, Color, Color});
 
 	VertexCount += 4;
 }
