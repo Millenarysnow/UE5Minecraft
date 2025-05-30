@@ -31,11 +31,13 @@ protected:
 private:
 	TArray<EBlock> Blocks;
 
-	void CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
+	void CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4, const int Width, const int Height);
 
 	int GetBlockIndex(int X, int Y, int Z) const;
 
 	EBlock GetBlock(FIntVector Index) const;
 
 	bool CompareMask(FMask M1, FMask M2) const;
+
+	int GetTextureIndex(EBlock Block, FVector Normal);
 };

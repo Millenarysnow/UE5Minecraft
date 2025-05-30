@@ -26,13 +26,12 @@ void AGreedyChunk::Generate2DHeightMap(const FVector Position)
 			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2), 0, Size);
     
 			// 下面为填充方块
-			for (int z = 0; z < Height; z++)
+			for (int z = 0; z < Size; z++)
 			{
-				Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
-			}
-			for (int z = Height; z < Size; z++)
-			{
-				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
+				if (z < Height - 3) Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
+				else if (z < Height - 1) Blocks[GetBlockIndex(x, y, z)] = EBlock::Dirt;
+				else if (z == Height - 1) Blocks[GetBlockIndex(x, y, z)] = EBlock::Grass;
+				else Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
 			}
 		}
 	}
@@ -178,7 +177,9 @@ void AGreedyChunk::GenerateMesh()
 							ChunkItr,
 							ChunkItr + DeltaAxis1,
 							ChunkItr+ DeltaAxis2,
-							ChunkItr + DeltaAxis1 + DeltaAxis2
+							ChunkItr + DeltaAxis1 + DeltaAxis2,
+							width,
+							height
 						);
 
 						// 清理变量
@@ -208,10 +209,12 @@ void AGreedyChunk::GenerateMesh()
 
 // 后四个参数表示矩形的四个顶点位置
 void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FIntVector V2, FIntVector V3,
-	FIntVector V4)
+	FIntVector V4, const int Width, const int Height)
 {
 	const auto Normal = FVector(AxisMask * Mask.Normal);
-	const auto Color = FColor(96, 35,115, 225);
+	
+	// 暂时使用颜色通道的Alpha传递纹理索引
+	const auto Color = FColor(0, 0,0, GetTextureIndex(Mask.Block, Normal));
 
 	MeshData.Vertices.Add(FVector(V1) * 100);
 	MeshData.Vertices.Add(FVector(V2) * 100);
@@ -225,10 +228,26 @@ void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FI
 	MeshData.Triangles.Add(VertexCount + 1 - Mask.Normal);
 	MeshData.Triangles.Add(VertexCount + 1 + Mask.Normal);
 
-	MeshData.UVO.Add(FVector2D(0, 0));
-	MeshData.UVO.Add(FVector2D(0, 1));
-	MeshData.UVO.Add(FVector2D(1, 0));
-	MeshData.UVO.Add(FVector2D(1, 1));
+	// 不考虑顶视图被旋转的情况下，修复UV方向问题
+	if (Normal.X == 1 || Normal.X == -1)
+	{
+		MeshData.UVO.Append({
+			FVector2D(Width, Height),
+			FVector2D(0, Height),
+			FVector2D(Width, 0),
+			FVector2D(0, 0)
+		});
+	}
+	else
+	{
+		MeshData.UVO.Append({
+			FVector2D(Height, Width),
+			FVector2D(Height, 0),
+			FVector2D(0, Width),
+			FVector2D(0, 0)
+		});
+
+	}
 
 	MeshData.Normals.Add(Normal);
 	MeshData.Normals.Add(Normal);
@@ -257,4 +276,23 @@ EBlock AGreedyChunk::GetBlock(FIntVector Index) const
 bool AGreedyChunk::CompareMask(FMask M1, FMask M2) const
 {
 	return M1.Block == M2.Block && M1.Normal == M2.Normal;
+}
+
+int AGreedyChunk::GetTextureIndex(EBlock Block, FVector Normal)
+{
+	switch (Block)
+	{
+	case EBlock::Grass:
+		{
+			if (Normal == FVector::UpVector) return 0;
+			if (Normal == FVector::DownVector) return 2;
+			return 1;
+		}
+	case EBlock::Dirt:
+		return 2;
+	case EBlock::Stone:
+		return 3;
+	default:
+		return 255;
+	}
 }
