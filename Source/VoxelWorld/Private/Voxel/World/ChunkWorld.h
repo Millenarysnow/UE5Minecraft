@@ -7,6 +7,10 @@
 
 class AChunkBase;
 
+/*
+ * **注意**: 该类已弃用
+*/
+
 UCLASS()
 class AChunkWorld : public AActor
 {
