@@ -20,6 +20,10 @@ class AGreedyChunk : public AChunkBase
 		int Normal; // 法线方向
 	};
 
+public:
+	UFUNCTION()
+	void ModifyTargetVoxel(const int& TargetIndex, const EBlock& Block);
+
 protected:
 	virtual void GenerateMesh() override;
 	virtual void Setup() override;

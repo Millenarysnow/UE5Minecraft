@@ -1,5 +1,6 @@
 #include "ChunkWorld.h"
 #include "Voxel/Chunk/ChunkBase.h"
+#include "Voxel/Utils/VoxelFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
 AChunkWorld::AChunkWorld()
@@ -34,14 +35,16 @@ void AChunkWorld::Generate3DWorld()
 		{
 			for (int z = -DrawDistance; z <= DrawDistance; ++z)
 			{
+				const auto ChunkLocation = FVector(x * Size * 100, y * Size * 100, z * Size * 100);
+				
 				auto transform = FTransform(
 					FRotator::ZeroRotator,
-					FVector(x * Size * 100, y * Size * 100, z * Size * 100),
+					ChunkLocation,
 					FVector::OneVector
 				);
 				
 				const auto chunk = GetWorld()->SpawnActorDeferred<AChunkBase>(
-					Chunk,
+					ChunkType,
 					transform,
 					this
 				);
@@ -52,6 +55,8 @@ void AChunkWorld::Generate3DWorld()
 				chunk->Size = Size;
 
 				UGameplayStatics::FinishSpawningActor(chunk, transform);
+
+				Chunks.Emplace(FVector(x, y, z), chunk);
 				
 				ChunkCount++;
 			}
@@ -65,14 +70,16 @@ void AChunkWorld::Generate2DWorld()
 	{
 		for (int y = -DrawDistance; y <= DrawDistance; ++y)
 		{
+			const auto ChunkLocation = FVector(x * Size * 100, y * Size * 100, 0);
+			
 			auto transform = FTransform(
 				FRotator::ZeroRotator,
-				FVector(x * Size * 100, y * Size * 100, 0),
+				ChunkLocation,
 				FVector::OneVector
 			);
 				
 			const auto chunk = GetWorld()->SpawnActorDeferred<AChunkBase>(
-				Chunk,
+				ChunkType,
 				transform,
 				this
 			);
@@ -84,7 +91,21 @@ void AChunkWorld::Generate2DWorld()
 
 			UGameplayStatics::FinishSpawningActor(chunk, transform);
 
+			Chunks.Emplace(FVector(x, y, 0), chunk);
+
 			ChunkCount++;
 		}
 	}
+}
+
+void AChunkWorld::ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block)
+{
+	const FVector ChunkLocation = (FVector)UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
+
+	UE_LOG(LogTemp, Warning, TEXT("Modifying Voxel %s"), *ChunkLocation.ToString());
+	
+	if (!Chunks.Contains(ChunkLocation)) return;
+	AChunkBase* TargetChunk = Chunks[ChunkLocation];
+
+	TargetChunk->ModifyVoxel(ChunkPosition, Block);
 }

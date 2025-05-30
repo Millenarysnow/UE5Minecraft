@@ -60,13 +60,6 @@ void AGreedyChunk::Generate3DHeightMap(const FVector Position)
     }
 }
 
-void AGreedyChunk::ModifyVoxelData(const FIntVector Position, EBlock Block)
-{
-	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
-
-	Blocks[Index] = Block;
-}
-
 void AGreedyChunk::GenerateMesh()
 {
 	// 贪婪网格（Greedy Meshing）生成主函数
@@ -295,4 +288,16 @@ int AGreedyChunk::GetTextureIndex(EBlock Block, FVector Normal)
 	default:
 		return 255;
 	}
+}
+
+void AGreedyChunk::ModifyTargetVoxel(const int& TargetIndex, const EBlock& Block)
+{
+	Blocks[TargetIndex] = Block;
+}
+
+void AGreedyChunk::ModifyVoxelData(const FIntVector Position, EBlock Block)
+{
+	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
+
+	Blocks[Index] = Block;
 }

@@ -16,7 +16,7 @@ public:
 	AChunkWorld();
 
 	UPROPERTY(EditAnywhere, Category = "ChunkWorld")
-	TSubclassOf<AChunkBase> Chunk;
+	TSubclassOf<AChunkBase> ChunkType;
 
 	UPROPERTY(EditAnywhere, Category = "ChunkWorld")
 	int DrawDistance = 5;
@@ -32,12 +32,11 @@ public:
 
 	UPROPERTY(EditInstanceOnly, Category = "ChunkWorld")
 	float Frequency = 0.03f;
-	
-	/*
-	// 注意必须与Chunk中相同
-	UPROPERTY(EditAnywhere, Category = "ChunkWorld")
-	int ChunkSize = 32; 
-	*/
+
+	UFUNCTION(BlueprintCallable, Category = "Voxel")
+	void ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block);
+
+	TMap<FVector, TObjectPtr<AChunkBase>> Chunks;
 	
 protected:
 	virtual void BeginPlay() override;

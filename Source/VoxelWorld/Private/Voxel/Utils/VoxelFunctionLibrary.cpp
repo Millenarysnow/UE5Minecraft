@@ -14,11 +14,11 @@ FIntVector UVoxelFunctionLibrary::WorldToLocalBlockPosition(const FVector& Posit
 
 	// 将方块位置从世界坐标系转至区块坐标系
 	auto Result = WorldToBlockPosition(Position) - ChunkPosition * Size;
-
+	
 	// 负值的归一化
-	if (ChunkPosition.X) Result.X--;
-	if (ChunkPosition.Y) Result.Y--;
-	if (ChunkPosition.Z) Result.Z--;
+	if (ChunkPosition.X < 0) Result.X--;
+	if (ChunkPosition.Y < 0) Result.Y--;
+	if (ChunkPosition.Z < 0) Result.Z--;
 
 	return Result;
 }
