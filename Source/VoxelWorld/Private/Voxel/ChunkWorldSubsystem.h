@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <random>
+
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Utils/Enums.h"
@@ -18,6 +20,8 @@ class UChunkWorldSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	std::default_random_engine RandomEngine;
+	
 	UPROPERTY()
 	TSubclassOf<AChunkBase> ChunkType;
 
@@ -42,6 +46,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	void ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block);
 
+	UFUNCTION(BlueprintCallable,  Category = "Voxel")
+	EBlock GetTargetVoxelType(const FVector WorldPosition);
+
 	UFUNCTION(BlueprintCallable)
 	static UChunkWorldSubsystem* Get(const UObject* WorldContextObject);
 
@@ -50,7 +57,7 @@ protected:
 
 private:
 	int ChunkCount;
-	TMap<FVector, TObjectPtr<AChunkBase>> Chunks;
+	TMap<FIntVector, TObjectPtr<AChunkBase>> Chunks;
 
 	void Generate3DWorld();
 	void Generate2DWorld();

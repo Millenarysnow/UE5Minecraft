@@ -43,3 +43,8 @@ FIntVector UVoxelFunctionLibrary::WorldToChunkPosition(const FVector& Position, 
 
 	return Result;
 }
+
+FVector UVoxelFunctionLibrary::LocalBlockToWorldPosition(const FIntVector& LocalBlockPosition, const FVector& ChunkPosition)
+{
+	return FVector(LocalBlockPosition) * 100 + ChunkPosition;
+}

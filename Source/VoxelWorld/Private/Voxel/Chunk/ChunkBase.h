@@ -24,12 +24,16 @@ public:
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> Material;
 
+	FVector ChunkPosition = FVector::ZeroVector;
+
 	float Frequency = 0.03f;
 
 	EGenerationType GenerationType;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, EBlock Block);
+	
+	virtual EBlock GetVoxel(const FIntVector Position) const {return EBlock::Null;}
 
 protected:
 	virtual void BeginPlay() override;

@@ -10,6 +10,8 @@
 void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+
+	RandomEngine.seed(std::time(0));
 }
 
 void UChunkWorldSubsystem::GenerateWorld()
@@ -31,14 +33,30 @@ void UChunkWorldSubsystem::GenerateWorld()
 
 void UChunkWorldSubsystem::ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block)
 {
-	const FVector ChunkLocation = (FVector)UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
+	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
 
-	UE_LOG(LogTemp, Warning, TEXT("Modifying Voxel %s"), *ChunkLocation.ToString());
+	//UE_LOG(LogTemp, Warning, TEXT("Modifying Voxel %s"), *ChunkLocation.ToString());
 	
 	if (!Chunks.Contains(ChunkLocation)) return;
 	AChunkBase* TargetChunk = Chunks[ChunkLocation];
 
 	TargetChunk->ModifyVoxel(ChunkPosition, Block);
+}
+
+EBlock UChunkWorldSubsystem::GetTargetVoxelType(const FVector WorldPosition)
+{
+	//UE_LOG(LogTemp, Warning, TEXT("Getting Voxel WorldPoint : %s"), *WorldPosition.ToString())
+	
+	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
+
+	//UE_LOG(LogTemp, Warning, TEXT("Getting Voxel ChunkWorld : %s"), *ChunkLocation.ToString())
+	
+	if (!Chunks.Contains(ChunkLocation)) return EBlock::Null;
+	AChunkBase* TargetChunk = Chunks[ChunkLocation];
+
+	//UE_LOG(LogTemp, Warning, TEXT("Getting Voxel Comp"));
+
+	return TargetChunk->GetVoxel(UVoxelFunctionLibrary::WorldToLocalBlockPosition(WorldPosition, Size));
 }
 
 UChunkWorldSubsystem* UChunkWorldSubsystem::Get(const UObject* WorldContextObject)
@@ -74,6 +92,7 @@ void UChunkWorldSubsystem::Generate3DWorld()
 				chunk->Frequency = Frequency;
 				chunk->Material = Material;
 				chunk->Size = Size;
+				chunk->ChunkPosition = ChunkLocation;
 
 				UGameplayStatics::FinishSpawningActor(chunk, transform);
 
@@ -105,14 +124,15 @@ void UChunkWorldSubsystem::Generate2DWorld()
 				nullptr
 			);
 
+			Chunks.Emplace(FVector(x, y, 0), chunk);
+
 			chunk->GenerationType = EGenerationType::GT_2D;
 			chunk->Frequency = Frequency;
 			chunk->Material = Material;
 			chunk->Size = Size;
+			chunk->ChunkPosition = ChunkLocation;
 
 			UGameplayStatics::FinishSpawningActor(chunk, transform);
-
-			Chunks.Emplace(FVector(x, y, 0), chunk);
 
 			ChunkCount++;
 		}
