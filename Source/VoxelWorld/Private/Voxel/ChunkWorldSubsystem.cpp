@@ -34,8 +34,6 @@ void UChunkWorldSubsystem::GenerateWorld()
 void UChunkWorldSubsystem::ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block)
 {
 	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
-
-	//UE_LOG(LogTemp, Warning, TEXT("Modifying Voxel %s"), *ChunkLocation.ToString());
 	
 	if (!Chunks.Contains(ChunkLocation)) return;
 	AChunkBase* TargetChunk = Chunks[ChunkLocation];
@@ -45,17 +43,11 @@ void UChunkWorldSubsystem::ModifyTargetVoxel(const FIntVector ChunkPosition, con
 
 EBlock UChunkWorldSubsystem::GetTargetVoxelType(const FVector WorldPosition)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("Getting Voxel WorldPoint : %s"), *WorldPosition.ToString())
-	
 	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
-
-	//UE_LOG(LogTemp, Warning, TEXT("Getting Voxel ChunkWorld : %s"), *ChunkLocation.ToString())
 	
 	if (!Chunks.Contains(ChunkLocation)) return EBlock::Null;
 	AChunkBase* TargetChunk = Chunks[ChunkLocation];
-
-	//UE_LOG(LogTemp, Warning, TEXT("Getting Voxel Comp"));
-
+	
 	return TargetChunk->GetVoxel(UVoxelFunctionLibrary::WorldToLocalBlockPosition(WorldPosition, Size));
 }
 

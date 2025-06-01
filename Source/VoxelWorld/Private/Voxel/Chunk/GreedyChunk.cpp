@@ -380,31 +380,22 @@ void AGreedyChunk::GenerateTree(int X, int Y, int Z)
 		// 按二分得到的 t 获取贝塞尔对应的y
 		float R = Bezier.valueAt(l, 1) * 100.0f;
 
-		//UE_LOG(LogTemp, Log, TEXT("Tree R : %d, %f"), i, R);
-
 		// 转换为世界坐标
-		const auto Center = UVoxelFunctionLibrary::LocalBlockToWorldPosition(FIntVector(X, Y, Z + i), ChunkPosition);
+		const FVector Center = UVoxelFunctionLibrary::LocalBlockToWorldPosition(FIntVector(X, Y, Z + i), ChunkPosition) + FVector(1, 1,1);
 
-		//DrawDebugBox(GetWorld(), Center, FVector(100, 100, 100), FColor::Red, false, 10000.0f);
-		
 		DfsStuffLeaves(Center.X, Center.Y, Center.Z, R, Center.X, Center.Y);
 	}
 }
 
 void AGreedyChunk::DfsStuffLeaves(int X, int Y, int Z, float R, int CenterX, int CenterY)
 {
-	//UE_LOG(LogTemp, Log, TEXT("DFS Stuff Leaves : %d %d %d"), X, Y, Z);
-	
 	for (int i = 0; i < 4; i++)
 	{
-		const int x = X + dx[i] * 100;
-		const int y = Y + dy[i] * 100;
+		const float x = X + dx[i] * 100.0f;
+		const float y = Y + dy[i] * 100.0f;
 		
 		if (Calculate2DDistance(x, y, CenterX, CenterY) > R) continue;
 
-		//UE_LOG(LogTemp, Log, TEXT("DFS Stuff Leaves for : %d %d"), x, y);
-		//UE_LOG(LogTemp, Log, TEXT("DFS Stuff Leaves type : %d"), UChunkWorldSubsystem::Get(GetWorld())->GetTargetVoxelType(FVector(x, y, Z)));
-		
 		if (UChunkWorldSubsystem::Get(GetWorld())->GetTargetVoxelType(FVector(x, y, Z)) == EBlock::Air)
 		{
 			UChunkWorldSubsystem::Get(GetWorld())->ModifyTargetVoxel(
