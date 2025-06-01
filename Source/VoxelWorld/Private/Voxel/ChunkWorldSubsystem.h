@@ -20,7 +20,7 @@ class UChunkWorldSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
-	std::default_random_engine RandomEngine;
+	std::default_random_engine RandomEngine; // C++随机引擎
 	
 	UPROPERTY()
 	TSubclassOf<AChunkBase> ChunkType;
@@ -42,11 +42,18 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	void GenerateWorld();
-	
+
+	/// 修改指定位置的方块
+	/// @param ChunkPosition 待修改位置的区块局部坐标
+	/// @param WorldPosition 待修改位置的世界坐标
+	/// @param Block 目标方块类型
 	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	void ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block);
 
-	UFUNCTION(BlueprintCallable,  Category = "Voxel")
+	/// 获取指定位置的方块类型
+	/// @param WorldPosition 待获取位置的世界坐标
+	/// @return 目标位置的方块类型
+	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	EBlock GetTargetVoxelType(const FVector WorldPosition);
 
 	UFUNCTION(BlueprintCallable)
@@ -57,7 +64,7 @@ protected:
 
 private:
 	int ChunkCount;
-	TMap<FIntVector, TObjectPtr<AChunkBase>> Chunks;
+	TMap<FIntVector, TObjectPtr<AChunkBase>> Chunks; // 区块列表
 
 	void Generate3DWorld();
 	void Generate2DWorld();

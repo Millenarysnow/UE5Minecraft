@@ -43,7 +43,7 @@ void AGreedyChunk::Generate2DHeightMap(const FVector Position)
 				else Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
 			}
 
-			// 生成树
+			// 生成区块中树的位置
 			if (u(UChunkWorldSubsystem::Get(GetWorld())->RandomEngine) <= Tree)
 			{
 				TreePoints.Add(FVector(x, y, Height));
@@ -51,6 +51,7 @@ void AGreedyChunk::Generate2DHeightMap(const FVector Position)
 		}
 	}
 
+	// 根据位置生成树
 	for (auto i : TreePoints)
 	{
 		GenerateTree(i.X, i.Y, i.Z);
@@ -327,8 +328,6 @@ EBlock AGreedyChunk::GetVoxel(const FIntVector Position) const
 {
 	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
 
-	UE_LOG(LogTemp, Log, TEXT("AGreedyChunk::GetVoxel"));
-
 	return Blocks[Index];
 }
 
@@ -383,19 +382,23 @@ void AGreedyChunk::GenerateTree(int X, int Y, int Z)
 		// 转换为世界坐标
 		const FVector Center = UVoxelFunctionLibrary::LocalBlockToWorldPosition(FIntVector(X, Y, Z + i), ChunkPosition) + FVector(1, 1,1);
 
+		// 填充当前层树叶
 		DfsStuffLeaves(Center.X, Center.Y, Center.Z, R, Center.X, Center.Y);
 	}
 }
 
 void AGreedyChunk::DfsStuffLeaves(int X, int Y, int Z, float R, int CenterX, int CenterY)
 {
+	// 遍历水平四个方向
 	for (int i = 0; i < 4; i++)
 	{
 		const float x = X + dx[i] * 100.0f;
 		const float y = Y + dy[i] * 100.0f;
-		
+
+		// 如果大于半径就跳过
 		if (Calculate2DDistance(x, y, CenterX, CenterY) > R) continue;
 
+		// 只有位置为空才填充
 		if (UChunkWorldSubsystem::Get(GetWorld())->GetTargetVoxelType(FVector(x, y, Z)) == EBlock::Air)
 		{
 			UChunkWorldSubsystem::Get(GetWorld())->ModifyTargetVoxel(

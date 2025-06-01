@@ -36,6 +36,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Voxel")
 	static FIntVector WorldToChunkPosition(const FVector& Position, const int Size);
 
+	/// 从局部坐标获取世界坐标
+	/// @param LocalBlockPosition 局部坐标
+	/// @param ChunkPosition 区块的世界坐标
+	/// @return 方块的世界坐标
 	UFUNCTION(BlueprintPure, Category = "Voxel")
 	static FVector LocalBlockToWorldPosition(const FIntVector& LocalBlockPosition, const FVector& ChunkPosition);
 };

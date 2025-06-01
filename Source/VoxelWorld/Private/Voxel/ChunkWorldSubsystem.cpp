@@ -33,8 +33,10 @@ void UChunkWorldSubsystem::GenerateWorld()
 
 void UChunkWorldSubsystem::ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block)
 {
+	// 获取目标方块所在的区块的世界坐标
 	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
-	
+
+	// 获取指定区块
 	if (!Chunks.Contains(ChunkLocation)) return;
 	AChunkBase* TargetChunk = Chunks[ChunkLocation];
 
@@ -80,6 +82,8 @@ void UChunkWorldSubsystem::Generate3DWorld()
 					nullptr
 				);
 
+				Chunks.Emplace(FVector(x, y, z), chunk);
+
 				chunk->GenerationType = EGenerationType::GT_3D;
 				chunk->Frequency = Frequency;
 				chunk->Material = Material;
@@ -87,8 +91,6 @@ void UChunkWorldSubsystem::Generate3DWorld()
 				chunk->ChunkPosition = ChunkLocation;
 
 				UGameplayStatics::FinishSpawningActor(chunk, transform);
-
-				Chunks.Emplace(FVector(x, y, z), chunk);
 				
 				ChunkCount++;
 			}
