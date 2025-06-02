@@ -48,3 +48,8 @@ FVector UVoxelFunctionLibrary::LocalBlockToWorldPosition(const FIntVector& Local
 {
 	return FVector(LocalBlockPosition) * 100 + ChunkPosition;
 }
+
+float UVoxelFunctionLibrary::Calculate2DDistance(const float& X1, const float& Y1, const float& X2, const float& Y2)
+{
+	return sqrt(pow(X1 - X2, 2) + pow(Y1 - Y2, 2));
+}

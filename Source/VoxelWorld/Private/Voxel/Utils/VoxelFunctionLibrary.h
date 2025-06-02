@@ -42,4 +42,7 @@ public:
 	/// @return 方块的世界坐标
 	UFUNCTION(BlueprintPure, Category = "Voxel")
 	static FVector LocalBlockToWorldPosition(const FIntVector& LocalBlockPosition, const FVector& ChunkPosition);
+
+	/// 计算两个点之间的距离 2D
+	static float Calculate2DDistance(const float& X1, const float& Y1, const float& X2, const float& Y2);
 };

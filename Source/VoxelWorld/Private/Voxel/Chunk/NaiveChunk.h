@@ -15,13 +15,14 @@ class ANaiveChunk : public AChunkBase
 {
 	GENERATED_BODY()
 
+public:
+	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) override;
+
 protected:
 	virtual void Setup() override;
 	virtual void Generate2DHeightMap(const FVector Position) override;
 	virtual void Generate3DHeightMap(const FVector Position) override;
 	virtual void GenerateMesh() override;
-
-	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) override;
 
 private:
 	TArray<EBlock> Blocks;

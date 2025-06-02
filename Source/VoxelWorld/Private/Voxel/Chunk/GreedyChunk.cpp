@@ -1,15 +1,12 @@
 #include "GreedyChunk.h"
 
 #include "Voxel/Utils/Enums.h"
-#include "ProceduralMeshComponent.h"
 #include "Voxel/Utils/FastNoiseLite.h"
 
 #include <random>
-#include <ctime>
 
 #include "Voxel/ChunkWorldSubsystem.h"
-#include "Voxel/Utils/bezier.h"
-#include "Voxel/Utils/VoxelFunctionLibrary.h"
+#include "Voxel/World/GenerateTreeSubsystem.h"
 
 void AGreedyChunk::Setup()
 {
@@ -20,6 +17,8 @@ void AGreedyChunk::Setup()
 void AGreedyChunk::Generate2DHeightMap(const FVector Position)
 {
 	std::uniform_real_distribution<double> u(0,100);
+
+	TArray<FVector> TreePoints; // 生成树的位置
 	
 	for (int x = 0; x < Size; x++)
 	{
@@ -54,7 +53,7 @@ void AGreedyChunk::Generate2DHeightMap(const FVector Position)
 	// 根据位置生成树
 	for (auto i : TreePoints)
 	{
-		GenerateTree(i.X, i.Y, i.Z);
+		UGenerateTreeSubsystem::Get(GetWorld())->GenerateTree(i.X, i.Y, i.Z, ChunkPosition, this, Size);
 	}
 }
 
@@ -336,83 +335,4 @@ void AGreedyChunk::ModifyVoxelData(const FIntVector Position, EBlock Block)
 	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
 
 	Blocks[Index] = Block;
-}
-
-void AGreedyChunk::GenerateTree(int X, int Y, int Z)
-{
-	// 随机树的高度
-	std::uniform_int_distribution<int> u(5,7);
-	int TreeHeight = u(UChunkWorldSubsystem::Get(GetWorld())->RandomEngine);
-
-	// 生成树干
-	for (int i = 0; i < TreeHeight; i++)
-	{
-		ModifyVoxelData(FIntVector(X, Y, Z + i), EBlock::Wood);
-	}
-
-	// 填充树叶的贝塞尔曲线 高度->贝塞尔x, 半径->贝塞尔y
-	float ControlPoint[4];
-	ControlPoint[0] = 2; // 第一层树叶的下面一层
-	ControlPoint[1] = (TreeHeight - 2 + 1) / 3.0f + 2;
-	ControlPoint[2] = (TreeHeight - 2 + 1) / 3.0f * 2 + 2; 
-	ControlPoint[3] = TreeHeight + 1; // 最顶层树叶的上面一层
-
-	bezier::Bezier<3> Bezier({
-		{ControlPoint[0], 0.0f},
-		{ControlPoint[1], 4.5f},
-		{ControlPoint[2], 2.5f},
-		{ControlPoint[3], 0.0f}
-	});
-
-	// 按层生成树叶
-	for (int i = ControlPoint[0] + 1; i < ControlPoint[3]; i++)
-	{
-		// 二分 t ,找到对应 x 位置的 t
-		float l = 0, r = 1;
-		while ((r - l) > exp)
-		{
-			float mid = (l + r) / 2.0f;
-			if (Bezier.valueAt(mid, 0) < i) l = mid;
-			else r = mid;
-		}
-		
-		// 按二分得到的 t 获取贝塞尔对应的y
-		float R = Bezier.valueAt(l, 1) * 100.0f;
-
-		// 转换为世界坐标
-		const FVector Center = UVoxelFunctionLibrary::LocalBlockToWorldPosition(FIntVector(X, Y, Z + i), ChunkPosition) + FVector(1, 1,1);
-
-		// 填充当前层树叶
-		DfsStuffLeaves(Center.X, Center.Y, Center.Z, R, Center.X, Center.Y);
-	}
-}
-
-void AGreedyChunk::DfsStuffLeaves(int X, int Y, int Z, float R, int CenterX, int CenterY)
-{
-	// 遍历水平四个方向
-	for (int i = 0; i < 4; i++)
-	{
-		const float x = X + dx[i] * 100.0f;
-		const float y = Y + dy[i] * 100.0f;
-
-		// 如果大于半径就跳过
-		if (Calculate2DDistance(x, y, CenterX, CenterY) > R) continue;
-
-		// 只有位置为空才填充
-		if (UChunkWorldSubsystem::Get(GetWorld())->GetTargetVoxelType(FVector(x, y, Z)) == EBlock::Air)
-		{
-			UChunkWorldSubsystem::Get(GetWorld())->ModifyTargetVoxel(
-				UVoxelFunctionLibrary::WorldToLocalBlockPosition(FVector(x, y, Z), Size),
-				FVector(x, y, Z),
-				EBlock::Leaf
-			);
-			
-			DfsStuffLeaves(x, y, Z, R, CenterX, CenterY);
-		}
-	}
-}
-
-float AGreedyChunk::Calculate2DDistance(float X1, float Y1, float X2, float Y2)
-{
-	 return sqrt(pow(X1 - X2, 2) + pow(Y1 - Y2, 2));
 }

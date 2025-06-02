@@ -35,14 +35,14 @@ public:
 	
 	virtual EBlock GetVoxel(const FIntVector Position) const {return EBlock::Null;}
 
+	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) PURE_VIRTUAL(AChunkBase::ModifyVoxelData);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Setup() PURE_VIRTUAL(AChunkBase::Setup);
 	virtual void Generate2DHeightMap(const FVector Position) PURE_VIRTUAL(AChunkBase::Generate2DHeightMap);
 	virtual void Generate3DHeightMap(const FVector Position) PURE_VIRTUAL(AChunkBase::Generate3DHeightMap);
 	virtual void GenerateMesh() PURE_VIRTUAL(AChunkBase::GenerateMesh);
-
-	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) PURE_VIRTUAL(AChunkBase::ModifyVoxelData);
 
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	FastNoiseLite* Noise;
