@@ -16,7 +16,7 @@ void UGenerateTreeSubsystem::GenerateTree(int X, int Y, int Z, FVector ChunkPosi
 	
 	// 随机树的高度
 	std::uniform_int_distribution<int> u(5,7);
-	int TreeHeight = u(UChunkWorldSubsystem::Get(GetWorld())->RandomEngine);
+	const int TreeHeight = u(UChunkWorldSubsystem::Get(GetWorld())->RandomEngine);
 
 	// 生成树干
 	for (int i = 0; i < TreeHeight; i++)
@@ -31,7 +31,7 @@ void UGenerateTreeSubsystem::GenerateTree(int X, int Y, int Z, FVector ChunkPosi
 	ControlPoint[2] = (TreeHeight - 2 + 1) / 3.0f * 2 + 2; 
 	ControlPoint[3] = TreeHeight + 1; // 最顶层树叶的上面一层
 
-	bezier::Bezier<3> Bezier({
+	const bezier::Bezier<3> Bezier({
 		{ControlPoint[0], 0.0f},
 		{ControlPoint[1], 4.5f},
 		{ControlPoint[2], 2.5f},
@@ -43,7 +43,7 @@ void UGenerateTreeSubsystem::GenerateTree(int X, int Y, int Z, FVector ChunkPosi
 	{
 		// 二分 t ,找到对应 x 位置的 t
 		float l = 0, r = 1;
-		while ((r - l) > exp)
+		while (r - l > exp)
 		{
 			float mid = (l + r) / 2.0f;
 			if (Bezier.valueAt(mid, 0) < i) l = mid;
@@ -51,7 +51,7 @@ void UGenerateTreeSubsystem::GenerateTree(int X, int Y, int Z, FVector ChunkPosi
 		}
 		
 		// 按二分得到的 t 获取贝塞尔对应的y
-		float R = Bezier.valueAt(l, 1) * 100.0f;
+		const float R = Bezier.valueAt(l, 1) * 100.0f;
 
 		// 转换为世界坐标
 		const FVector Center = UVoxelFunctionLibrary::LocalBlockToWorldPosition(FIntVector(X, Y, Z + i), ChunkPosition) + FVector(1, 1,1);
