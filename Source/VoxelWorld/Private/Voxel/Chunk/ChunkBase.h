@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -7,7 +7,6 @@
 
 #include "ChunkBase.generated.h"
 
-class FastNoiseLite;
 class UProceduralMeshComponent;
 
 UCLASS(Abstract)
@@ -19,40 +18,42 @@ public:
 	AChunkBase();
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chunk")
-	int Size = 64;
+	int Size = 32;
 
+	// 贴图材质（采样 voxel texture array）。供 Grass/Dirt/Stone/Wood/Leaf 等已有贴图的方块使用。
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> Material;
 
-	FVector ChunkPosition = FVector::ZeroVector;
+	// 纯色材质（VertexColor.RGB → BaseColor）。供尚未制作贴图的方块使用。
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> MaterialColor;
 
-	float Frequency = 0.03f;
-
-	EGenerationType GenerationType;
+	// 区块原点（区块 (0,0,0) 方块对应的世界方块坐标）。世界坐标 = ChunkOriginVoxel * 100。
+	FIntVector ChunkOriginVoxel = FIntVector::ZeroValue;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, EBlock Block);
-	
-	virtual EBlock GetVoxel(const FIntVector Position) const {return EBlock::Null;}
+
+	virtual EBlock GetVoxel(const FIntVector Position) const { return EBlock::Null; }
 
 	virtual void ModifyVoxelData(const FIntVector Position, EBlock Block) PURE_VIRTUAL(AChunkBase::ModifyVoxelData);
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void Setup() PURE_VIRTUAL(AChunkBase::Setup);
-	virtual void Generate2DHeightMap(const FVector Position) PURE_VIRTUAL(AChunkBase::Generate2DHeightMap);
-	virtual void Generate3DHeightMap(const FVector Position) PURE_VIRTUAL(AChunkBase::Generate3DHeightMap);
+
+	// 子类在这里把体素数据填进自己的容器（例如 GreedyChunk::Blocks）。
+	virtual void GenerateVoxelData() PURE_VIRTUAL(AChunkBase::GenerateVoxelData);
+
+	// 子类在这里读取体素数据并写入 MeshData。
 	virtual void GenerateMesh() PURE_VIRTUAL(AChunkBase::GenerateMesh);
 
 	TObjectPtr<UProceduralMeshComponent> Mesh;
-	FastNoiseLite* Noise;
-	FChunkMeshData MeshData;
+	FChunkMeshData MeshData;       // section 0：贴图方块
+	FChunkMeshData MeshDataColor;  // section 1：纯色方块
 	int VertexCount = 0;
+	int VertexCountColor = 0;
 
 private:
 	void ApplyMesh() const;
 	void ClearMesh();
-	virtual void GenerateHeightMap();
 };
-
-

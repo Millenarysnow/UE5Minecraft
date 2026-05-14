@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include <random>
@@ -12,7 +10,8 @@
 class AChunkBase;
 
 /**
- * 
+ * 区块世界子系统：管理已 spawn 的 chunk 表，负责按列布局生成。
+ * y ∈ [-64, 320] 共 12 个 size=32 的立方区块，每个 (cx, cy) 列堆 12 个。
  */
 UCLASS()
 class UChunkWorldSubsystem : public UGameInstanceSubsystem
@@ -20,8 +19,8 @@ class UChunkWorldSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
-	std::default_random_engine RandomEngine; // C++随机引擎
-	
+	std::default_random_engine RandomEngine;
+
 	UPROPERTY()
 	TSubclassOf<AChunkBase> ChunkType;
 
@@ -32,27 +31,24 @@ public:
 	TObjectPtr<UMaterialInterface> Material;
 
 	UPROPERTY()
+	TObjectPtr<UMaterialInterface> MaterialColor;
+
+	UPROPERTY()
 	int Size = 32;
 
+	// y 范围（方块坐标）。Mojang 默认 [-64, 320]，高 384。
 	UPROPERTY()
-	EGenerationType GenerationType = EGenerationType::GT_2D;
+	int MinWorldY = -64;
 
 	UPROPERTY()
-	float Frequency = 0.03f;
+	int MaxWorldY = 320;
 
 	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	void GenerateWorld();
 
-	/// 修改指定位置的方块
-	/// @param ChunkPosition 待修改位置的区块局部坐标
-	/// @param WorldPosition 待修改位置的世界坐标
-	/// @param Block 目标方块类型
 	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	void ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block);
 
-	/// 获取指定位置的方块类型
-	/// @param WorldPosition 待获取位置的世界坐标
-	/// @return 目标位置的方块类型
 	UFUNCTION(BlueprintCallable, Category = "Voxel")
 	EBlock GetTargetVoxelType(const FVector WorldPosition);
 
@@ -63,11 +59,6 @@ protected:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
 private:
-	int ChunkCount;
-	TMap<FIntVector, TObjectPtr<AChunkBase>> Chunks; // 区块列表
-
-	void Generate3DWorld();
-	void Generate2DWorld();
+	int ChunkCount = 0;
+	TMap<FIntVector, TObjectPtr<AChunkBase>> Chunks; // 按区块格坐标 (cx, cy, cz) 索引
 };
-
-

@@ -1,83 +1,56 @@
 #include "GreedyChunk.h"
 
+#include "Voxel/Generation/WorldGenerator.h"
 #include "Voxel/Utils/Enums.h"
-#include "Voxel/Utils/FastNoiseLite.h"
 
-#include <random>
-
-#include "Voxel/ChunkWorldSubsystem.h"
-#include "Voxel/World/GenerateTreeSubsystem.h"
-
-void AGreedyChunk::Setup()
+namespace
 {
-	// 初始化方块数组
-	Blocks.SetNum(Size * Size * Size);
-}
-
-void AGreedyChunk::Generate2DHeightMap(const FVector Position)
-{
-	std::uniform_real_distribution<double> u(0,100);
-
-	TArray<FVector> TreePoints; // 生成树的位置
-	
-	for (int x = 0; x < Size; x++)
+	// 已制作贴图的方块直接走 texture array 路径；未制作贴图的方块走纯色 vertex-color 路径。
+	bool IsColoredBlock(EBlock B)
 	{
-		for (int y = 0; y < Size; y++)
+		switch (B)
 		{
-			const float Xpos = x + Position.X;
-			const float Ypos = y + Position.Y;
-
-			// GetNoise返回一个[-1, 1]的数
-			// (Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2 用于将这个数缩放至[0, Size]
-			// RoundToInt 将浮点数四舍五入为整数
-			// Clamp 将值限制在[0, Size]之间，实际上仅仅只是为了更安全
-			const int Height = FMath::Clamp(FMath::RoundToInt((Noise->GetNoise(Xpos, Ypos) + 1) * Size / 2), 0, Size);
-    
-			// 下面为填充方块
-			for (int z = 0; z < Size; z++)
-			{
-				if (z < Height - 3) Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
-				else if (z < Height - 1) Blocks[GetBlockIndex(x, y, z)] = EBlock::Dirt;
-				else if (z == Height - 1) Blocks[GetBlockIndex(x, y, z)] = EBlock::Grass;
-				else Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
-			}
-
-			// 生成区块中树的位置
-			if (u(UChunkWorldSubsystem::Get(GetWorld())->RandomEngine) <= Tree)
-			{
-				TreePoints.Add(FVector(x, y, Height));
-			}
+		case EBlock::Grass:
+		case EBlock::Dirt:
+		case EBlock::Stone:
+		case EBlock::Wood:
+		case EBlock::Leaf:
+			return false;
+		default:
+			return true;
 		}
 	}
 
-	// 根据位置生成树
-	for (auto i : TreePoints)
+	// 纯色方块的颜色查找表。每个方块挑一个易区分的颜色。
+	FColor GetBlockColor(EBlock B)
 	{
-		UGenerateTreeSubsystem::Get(GetWorld())->GenerateTree(i.X, i.Y, i.Z, ChunkPosition, this, Size);
+		switch (B)
+		{
+		case EBlock::Sand:        return FColor(220, 200, 130, 255); // 沙黄
+		case EBlock::Sandstone:   return FColor(200, 175, 110, 255); // 沙岩
+		case EBlock::Snow:        return FColor(245, 245, 255, 255); // 雪白带蓝
+		case EBlock::Water:       return FColor( 60, 110, 200, 255); // 水蓝
+		case EBlock::Bedrock:     return FColor( 40,  40,  45, 255); // 近黑
+		case EBlock::CoalOre:     return FColor( 60,  60,  60, 255); // 暗灰
+		case EBlock::IronOre:     return FColor(180, 140, 100, 255); // 铁锈
+		case EBlock::DiamondOre:  return FColor(130, 220, 220, 255); // 钻石青
+		case EBlock::SpruceLog:   return FColor( 90,  60,  30, 255); // 深棕
+		case EBlock::SpruceLeaf:  return FColor( 40, 100,  50, 255); // 深绿
+		default:                  return FColor(255,   0, 255, 255); // 洋红 = 未配置
+		}
 	}
 }
 
-void AGreedyChunk::Generate3DHeightMap(const FVector Position)
+void AGreedyChunk::GenerateVoxelData()
 {
-    for (int x = 0; x < Size; x++)
-    {
-    	for (int y = 0; y < Size; y++)
-    	{
-    		for (int z = 0; z < Size; z++)
-    		{
-    			const auto NoiseValue = Noise->GetNoise(Position.X + x, Position.Y + y, Position.Z + z);
+	UWorldGenerator* Gen = UWorldGenerator::Get(GetWorld());
+	if (!Gen)
+	{
+		Blocks.SetNumZeroed(Size * Size * Size);
+		return;
+	}
 
-    			if (NoiseValue >= 0)
-    			{
-    				Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
-    			}
-			    else
-			    {
-				    Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
-			    }
-    		}
-    	}
-    }
+	Gen->FillChunk(ChunkOriginVoxel, Size, Blocks);
 }
 
 void AGreedyChunk::GenerateMesh()
@@ -104,41 +77,34 @@ void AGreedyChunk::GenerateMesh()
 
 		AxisMask[Axis] = 1;
 
-		TArray<FMask> Mask; // 对于当前切片的掩码数组
-		Mask.SetNum(Axis1Limit * Axis2Limit); // 初始化大小（这是一个二维数组被压成了一维）
+		TArray<FMask> Mask;
+		Mask.SetNum(Axis1Limit * Axis2Limit);
 
-		// 遍历所有切片
 		for (ChunkItr[Axis] = -1; ChunkItr[Axis] < MainAxisLimit; )
 		{
-			int N = 0; // 掩码中的索引
+			int N = 0;
 
-			// 遍历垂直面，生成该面的所有掩码
 			for (ChunkItr[Axis2] = 0; ChunkItr[Axis2] < Axis2Limit; ChunkItr[Axis2]++)
 			{
 				for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < Axis1Limit; ChunkItr[Axis1]++)
 				{
-					const auto CurrentBlock = GetBlock(ChunkItr); // 当前方块
-					const auto CompareBlock = GetBlock(ChunkItr + AxisMask); // 在当前主轴方向上与当前方块相邻的方块
+					const auto CurrentBlock = GetBlock(ChunkItr);
+					const auto CompareBlock = GetBlock(ChunkItr + AxisMask);
 
-					// 判断两个方块是否是不透明方块
 					const bool CurrentBlockOpaque = CurrentBlock != EBlock::Air;
 					const bool CompareBlockOpaque = CompareBlock != EBlock::Air;
 
-					/*
-					 * 如果两个方块的透明属性相同，意味着当前这个方块的这个面不会被看到
-					 * 反之，就需要在这里创建一个掩码，法线方向指向不透明方块方向
-					*/
-					if (CurrentBlockOpaque == CompareBlockOpaque) // 相同则不创建面
+					if (CurrentBlockOpaque == CompareBlockOpaque)
 					{
 						Mask[N++] = FMask { EBlock::Null, 0 };
 					}
-					else if (CurrentBlockOpaque) // 当前方块不透明
+					else if (CurrentBlockOpaque)
 					{
-						Mask[N++] = FMask { CurrentBlock, 1}; // 法线方向 1 代表朝着当前方块创建了一个面
+						Mask[N++] = FMask { CurrentBlock, 1};
 					}
-					else // 相邻方块不透明
+					else
 					{
-						Mask[N++] = FMask { CompareBlock, -1}; // 法线方向 -1 代表朝着相邻方块创建了一个面
+						Mask[N++] = FMask { CompareBlock, -1};
 					}
 				}
 			}
@@ -146,7 +112,6 @@ void AGreedyChunk::GenerateMesh()
 			ChunkItr[Axis]++;
 			N = 0;
 
-			// 从掩码中生成网格体
 			for (int j = 0; j < Axis2Limit; j++)
 			{
 				for (int i = 0; i < Axis1Limit; )
@@ -157,17 +122,15 @@ void AGreedyChunk::GenerateMesh()
 						ChunkItr[Axis1] = i;
 						ChunkItr[Axis2] = j;
 
-						// 横向扩展，获取当前贪心合并的面的宽度
 						int width;
 						for (width = 1; i + width < Axis1Limit && CompareMask(Mask[N + width], CurrentMask); width++)
 						{ }
 
-						// 纵向扩展高度
 						int height;
 						bool done = false;
-						for (height = 1; j + height < Axis2Limit; height++) // 纵向扩展的层数
+						for (height = 1; j + height < Axis2Limit; height++)
 						{
-							for (int k = 0; k < width; k++) // 比较当前待扩展的层的方块是否都相同，相同才能扩展一层
+							for (int k = 0; k < width; k++)
 							{
 								if (CompareMask(Mask[N + k + height * Axis1Limit], CurrentMask))
 									continue;
@@ -179,23 +142,26 @@ void AGreedyChunk::GenerateMesh()
 							if (done) break;
 						}
 
-						// 记录计算结果，方便后续处理
 						DeltaAxis1[Axis1] = width;
 						DeltaAxis2[Axis2] = height;
 
-						// 创建合并后的一个面
+						const bool bColored = IsColoredBlock(CurrentMask.Block);
+						FChunkMeshData& Buf = bColored ? MeshDataColor : MeshData;
+						int& Count = bColored ? VertexCountColor : VertexCount;
+
 						CreateQuad(
 							CurrentMask,
 							AxisMask,
 							ChunkItr,
 							ChunkItr + DeltaAxis1,
-							ChunkItr+ DeltaAxis2,
+							ChunkItr + DeltaAxis2,
 							ChunkItr + DeltaAxis1 + DeltaAxis2,
 							width,
-							height
+							height,
+							Buf,
+							Count
 						);
 
-						// 清理变量
 						DeltaAxis1 = FIntVector::ZeroValue;
 						DeltaAxis2 = FIntVector::ZeroValue;
 						for (int l = 0; l < height; l++)
@@ -211,8 +177,8 @@ void AGreedyChunk::GenerateMesh()
 					}
 					else
 					{
-						i ++;
-						N ++;
+						i++;
+						N++;
 					}
 				}
 			}
@@ -220,31 +186,31 @@ void AGreedyChunk::GenerateMesh()
 	}
 }
 
-// 后四个参数表示矩形的四个顶点位置
 void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FIntVector V2, FIntVector V3,
-	FIntVector V4, const int Width, const int Height)
+	FIntVector V4, const int Width, const int Height, FChunkMeshData& Buffer, int& Count)
 {
 	const auto Normal = FVector(AxisMask * Mask.Normal);
-	
-	// 暂时使用颜色通道的Alpha传递纹理索引
-	const auto Color = FColor(0, 0,0, GetTextureIndex(Mask.Block, Normal));
 
-	MeshData.Vertices.Add(FVector(V1) * 100);
-	MeshData.Vertices.Add(FVector(V2) * 100);
-	MeshData.Vertices.Add(FVector(V3) * 100);
-	MeshData.Vertices.Add(FVector(V4) * 100);
+	const bool bColored = IsColoredBlock(Mask.Block);
+	const FColor Color = bColored
+		? GetBlockColor(Mask.Block)
+		: FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
 
-	MeshData.Triangles.Add(VertexCount);
-	MeshData.Triangles.Add(VertexCount + 2 + Mask.Normal);
-	MeshData.Triangles.Add(VertexCount + 2 - Mask.Normal);
-	MeshData.Triangles.Add(VertexCount + 3);
-	MeshData.Triangles.Add(VertexCount + 1 - Mask.Normal);
-	MeshData.Triangles.Add(VertexCount + 1 + Mask.Normal);
+	Buffer.Vertices.Add(FVector(V1) * 100);
+	Buffer.Vertices.Add(FVector(V2) * 100);
+	Buffer.Vertices.Add(FVector(V3) * 100);
+	Buffer.Vertices.Add(FVector(V4) * 100);
 
-	// 不考虑顶视图被旋转的情况下，修复UV方向问题
+	Buffer.Triangles.Add(Count);
+	Buffer.Triangles.Add(Count + 2 + Mask.Normal);
+	Buffer.Triangles.Add(Count + 2 - Mask.Normal);
+	Buffer.Triangles.Add(Count + 3);
+	Buffer.Triangles.Add(Count + 1 - Mask.Normal);
+	Buffer.Triangles.Add(Count + 1 + Mask.Normal);
+
 	if (Normal.X == 1 || Normal.X == -1)
 	{
-		MeshData.UVO.Append({
+		Buffer.UVO.Append({
 			FVector2D(Width, Height),
 			FVector2D(0, Height),
 			FVector2D(Width, 0),
@@ -253,23 +219,22 @@ void AGreedyChunk::CreateQuad(FMask Mask, FIntVector AxisMask, FIntVector V1, FI
 	}
 	else
 	{
-		MeshData.UVO.Append({
+		Buffer.UVO.Append({
 			FVector2D(Height, Width),
 			FVector2D(Height, 0),
 			FVector2D(0, Width),
 			FVector2D(0, 0)
 		});
-
 	}
 
-	MeshData.Normals.Add(Normal);
-	MeshData.Normals.Add(Normal);
-	MeshData.Normals.Add(Normal);
-	MeshData.Normals.Add(Normal);
+	Buffer.Normals.Add(Normal);
+	Buffer.Normals.Add(Normal);
+	Buffer.Normals.Add(Normal);
+	Buffer.Normals.Add(Normal);
 
-	MeshData.Colors.Append({Color, Color, Color, Color});
+	Buffer.Colors.Append({Color, Color, Color, Color});
 
-	VertexCount += 4;
+	Count += 4;
 }
 
 int AGreedyChunk::GetBlockIndex(int X, int Y, int Z) const
@@ -279,10 +244,9 @@ int AGreedyChunk::GetBlockIndex(int X, int Y, int Z) const
 
 EBlock AGreedyChunk::GetBlock(FIntVector Index) const
 {
-	// 越界时返回 Air
 	if (Index.X < 0 || Index.Y < 0 || Index.Z < 0 || Index.X >= Size || Index.Y >= Size || Index.Z >= Size)
 		return EBlock::Air;
-	
+
 	return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
 }
 
@@ -293,6 +257,7 @@ bool AGreedyChunk::CompareMask(FMask M1, FMask M2) const
 
 int AGreedyChunk::GetTextureIndex(EBlock Block, FVector Normal)
 {
+	// 仅处理 IsColoredBlock 返回 false 的方块；其余方块通过纯色路径渲染。
 	switch (Block)
 	{
 	case EBlock::Grass:
@@ -326,13 +291,11 @@ void AGreedyChunk::ModifyTargetVoxel(const int& TargetIndex, const EBlock& Block
 EBlock AGreedyChunk::GetVoxel(const FIntVector Position) const
 {
 	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
-
 	return Blocks[Index];
 }
 
 void AGreedyChunk::ModifyVoxelData(const FIntVector Position, EBlock Block)
 {
 	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
-
 	Blocks[Index] = Block;
 }

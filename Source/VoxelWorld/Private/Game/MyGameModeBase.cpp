@@ -4,19 +4,32 @@
 #include "Game/MyGameModeBase.h"
 
 #include "Voxel/ChunkWorldSubsystem.h"
+#include "Voxel/Generation/WorldGenerator.h"
 
 void AMyGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UChunkWorldSubsystem* ChunkWorldSubsystem = UChunkWorldSubsystem::Get(GetWorld());
+	UWorldGenerator* WorldGen = UWorldGenerator::Get(GetWorld());
+	if (WorldGen)
+	{
+		WorldGen->WorldSeed = WorldSeed;
+	}
 
-	ChunkWorldSubsystem->ChunkType = this->ChunkType;
-	ChunkWorldSubsystem->DrawDistance = this->DrawDistance;
-	ChunkWorldSubsystem->Frequency = this->Frequency;
-	ChunkWorldSubsystem->GenerationType = this->GenerationType;
-	ChunkWorldSubsystem->Material = this->Material;
-	ChunkWorldSubsystem->Size = this->Size;
+	UChunkWorldSubsystem* ChunkWorldSubsystem = UChunkWorldSubsystem::Get(GetWorld());
+	if (!ChunkWorldSubsystem)
+	{
+		UE_LOG(LogTemp, Error, TEXT("ChunkWorldSubsystem unavailable"));
+		return;
+	}
+
+	ChunkWorldSubsystem->ChunkType = ChunkType;
+	ChunkWorldSubsystem->DrawDistance = DrawDistance;
+	ChunkWorldSubsystem->Material = Material;
+	ChunkWorldSubsystem->MaterialColor = MaterialColor;
+	ChunkWorldSubsystem->Size = Size;
+	ChunkWorldSubsystem->MinWorldY = MinWorldY;
+	ChunkWorldSubsystem->MaxWorldY = MaxWorldY;
 
 	ChunkWorldSubsystem->GenerateWorld();
 }

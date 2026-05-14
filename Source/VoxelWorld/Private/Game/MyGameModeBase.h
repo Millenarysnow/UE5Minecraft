@@ -4,37 +4,40 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "Voxel/Utils/Enums.h"
 #include "MyGameModeBase.generated.h"
 
 class AChunkBase;
 
-/**
- * 
- */
 UCLASS()
 class AMyGameModeBase : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "World")
 	TSubclassOf<AChunkBase> ChunkType;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "World")
 	int DrawDistance = 5;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "World")
 	TObjectPtr<UMaterialInterface> Material;
 
-	UPROPERTY(EditAnywhere)
+	// 纯色材质：未制作贴图的方块从这里渲染。建议是一个把 VertexColor.RGB 接到 BaseColor 的简单材质。
+	UPROPERTY(EditAnywhere, Category = "World")
+	TObjectPtr<UMaterialInterface> MaterialColor;
+
+	UPROPERTY(EditAnywhere, Category = "World")
 	int Size = 32;
 
-	UPROPERTY(EditAnywhere)
-	EGenerationType GenerationType = EGenerationType::GT_2D;
+	UPROPERTY(EditAnywhere, Category = "World")
+	int MinWorldY = -64;
 
-	UPROPERTY(EditAnywhere)
-	float Frequency = 0.03f;
+	UPROPERTY(EditAnywhere, Category = "World")
+	int MaxWorldY = 320;
+
+	UPROPERTY(EditAnywhere, Category = "World")
+	int64 WorldSeed = 0;
 
 protected:
 	virtual void BeginPlay() override;

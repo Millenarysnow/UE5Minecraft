@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Voxel/ChunkWorldSubsystem.h"
 
 #include "Chunk/ChunkBase.h"
@@ -11,21 +8,51 @@ void UChunkWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	RandomEngine.seed(std::time(0));
+	RandomEngine.seed(static_cast<unsigned>(std::time(0)));
 }
 
 void UChunkWorldSubsystem::GenerateWorld()
 {
-	switch (GenerationType)
+	if (!ChunkType)
 	{
-	case EGenerationType::GT_3D:
-		Generate3DWorld();
-		break;
-	case EGenerationType::GT_2D:
-		Generate2DWorld();
-		break;
-	default:
-		throw std::exception("Invalid Generation Type");
+		UE_LOG(LogTemp, Error, TEXT("ChunkWorldSubsystem: ChunkType is null, abort GenerateWorld"));
+		return;
+	}
+
+	// 区块在 z 轴上的覆盖范围（向 0 取整除）
+	const int MinChunkZ = FMath::FloorToInt(static_cast<float>(MinWorldY) / Size);
+	const int MaxChunkZ = FMath::FloorToInt(static_cast<float>(MaxWorldY - 1) / Size);
+
+	for (int cx = -DrawDistance; cx <= DrawDistance; cx++)
+	{
+		for (int cy = -DrawDistance; cy <= DrawDistance; cy++)
+		{
+			for (int cz = MinChunkZ; cz <= MaxChunkZ; cz++)
+			{
+				const FIntVector ChunkGrid(cx, cy, cz);
+				const FIntVector OriginVoxel(cx * Size, cy * Size, cz * Size);
+				const FVector ChunkLocation = FVector(OriginVoxel) * 100.f;
+
+				const FTransform Transform(FRotator::ZeroRotator, ChunkLocation, FVector::OneVector);
+
+				AChunkBase* Chunk = GetWorld()->SpawnActorDeferred<AChunkBase>(
+					ChunkType,
+					Transform,
+					nullptr
+				);
+
+				Chunks.Emplace(ChunkGrid, Chunk);
+
+				Chunk->Material = Material;
+				Chunk->MaterialColor = MaterialColor;
+				Chunk->Size = Size;
+				Chunk->ChunkOriginVoxel = OriginVoxel;
+
+				UGameplayStatics::FinishSpawningActor(Chunk, Transform);
+
+				ChunkCount++;
+			}
+		}
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Created"), ChunkCount);
@@ -33,10 +60,8 @@ void UChunkWorldSubsystem::GenerateWorld()
 
 void UChunkWorldSubsystem::ModifyTargetVoxel(const FIntVector ChunkPosition, const FVector WorldPosition, EBlock Block)
 {
-	// 获取目标方块所在的区块的世界坐标
-	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
+	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition(WorldPosition, Size);
 
-	// 获取指定区块
 	if (!Chunks.Contains(ChunkLocation)) return;
 	AChunkBase* TargetChunk = Chunks[ChunkLocation];
 
@@ -45,11 +70,11 @@ void UChunkWorldSubsystem::ModifyTargetVoxel(const FIntVector ChunkPosition, con
 
 EBlock UChunkWorldSubsystem::GetTargetVoxelType(const FVector WorldPosition)
 {
-	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition((FVector)WorldPosition, Size);
-	
+	const FIntVector ChunkLocation = UVoxelFunctionLibrary::WorldToChunkPosition(WorldPosition, Size);
+
 	if (!Chunks.Contains(ChunkLocation)) return EBlock::Null;
 	AChunkBase* TargetChunk = Chunks[ChunkLocation];
-	
+
 	return TargetChunk->GetVoxel(UVoxelFunctionLibrary::WorldToLocalBlockPosition(WorldPosition, Size));
 }
 
@@ -58,77 +83,4 @@ UChunkWorldSubsystem* UChunkWorldSubsystem::Get(const UObject* WorldContextObjec
 	if (!WorldContextObject) return nullptr;
 	UGameInstance* GameInstance = WorldContextObject->GetWorld()->GetGameInstance();
 	return GameInstance ? GameInstance->GetSubsystem<UChunkWorldSubsystem>() : nullptr;
-}
-
-void UChunkWorldSubsystem::Generate3DWorld()
-{
-	for (int x = -DrawDistance; x <= DrawDistance; x++)
-	{
-		for (int y = -DrawDistance; y <= DrawDistance; ++y)
-		{
-			for (int z = -DrawDistance; z <= DrawDistance; ++z)
-			{
-				const auto ChunkLocation = FVector(x * Size * 100, y * Size * 100, z * Size * 100);
-				
-				auto transform = FTransform(
-					FRotator::ZeroRotator,
-					ChunkLocation,
-					FVector::OneVector
-				);
-				
-				const auto chunk = GetWorld()->SpawnActorDeferred<AChunkBase>(
-					ChunkType,
-					transform,
-					nullptr
-				);
-
-				Chunks.Emplace(FVector(x, y, z), chunk);
-
-				chunk->GenerationType = EGenerationType::GT_3D;
-				chunk->Frequency = Frequency;
-				chunk->Material = Material;
-				chunk->Size = Size;
-				chunk->ChunkPosition = ChunkLocation;
-
-				UGameplayStatics::FinishSpawningActor(chunk, transform);
-				
-				ChunkCount++;
-			}
-		}
-	}
-}
-
-void UChunkWorldSubsystem::Generate2DWorld()
-{
-	for (int x = -DrawDistance; x <= DrawDistance; x++)
-	{
-		for (int y = -DrawDistance; y <= DrawDistance; ++y)
-		{
-			const auto ChunkLocation = FVector(x * Size * 100, y * Size * 100, 0);
-			
-			auto transform = FTransform(
-				FRotator::ZeroRotator,
-				ChunkLocation,
-				FVector::OneVector
-			);
-				
-			const auto chunk = GetWorld()->SpawnActorDeferred<AChunkBase>(
-				ChunkType,
-				transform,
-				nullptr
-			);
-
-			Chunks.Emplace(FVector(x, y, 0), chunk);
-
-			chunk->GenerationType = EGenerationType::GT_2D;
-			chunk->Frequency = Frequency;
-			chunk->Material = Material;
-			chunk->Size = Size;
-			chunk->ChunkPosition = ChunkLocation;
-
-			UGameplayStatics::FinishSpawningActor(chunk, transform);
-
-			ChunkCount++;
-		}
-	}
 }

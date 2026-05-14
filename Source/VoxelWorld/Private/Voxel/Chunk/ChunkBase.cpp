@@ -1,30 +1,24 @@
-﻿
 #include "ChunkBase.h"
 #include "ProceduralMeshComponent.h"
-#include "Voxel/Utils/FastNoiseLite.h"
 
 AChunkBase::AChunkBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	
-	Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
-	Noise = new FastNoiseLite();
 
-	// Mesh 设置
+	Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
 	Mesh->SetCastShadow(false);
 	SetRootComponent(Mesh);
 }
 
 void AChunkBase::ModifyVoxel(const FIntVector Position, EBlock Block)
 {
-	if (Position.X < 0 || Position.Y < 0 || Position.Z < 0 || Position.X >= Size || Position.Y >= Size || Position.Z >= Size) return;
+	if (Position.X < 0 || Position.Y < 0 || Position.Z < 0 ||
+		Position.X >= Size || Position.Y >= Size || Position.Z >= Size) return;
 
 	ModifyVoxelData(Position, Block);
 
 	ClearMesh();
-
 	GenerateMesh();
-
 	ApplyMesh();
 }
 
@@ -32,34 +26,12 @@ void AChunkBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Noise->SetFrequency(Frequency);
-	Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
-
-	Setup();
-
-	GenerateHeightMap();
-
+	GenerateVoxelData();
 	GenerateMesh();
 
-	UE_LOG(LogTemp, Warning, TEXT("Vertex Count : %d"), VertexCount);
-	
-	ApplyMesh();
-}
+	UE_LOG(LogTemp, Verbose, TEXT("Chunk @ %s vertex count: %d"), *ChunkOriginVoxel.ToString(), VertexCount);
 
-void AChunkBase::GenerateHeightMap()
-{
-	switch (GenerationType)
-	{
-	case EGenerationType::GT_3D:
-		Generate3DHeightMap(GetActorLocation() / 100);
-		break;
-	case EGenerationType::GT_2D:
-		Generate2DHeightMap(GetActorLocation() / 100);
-		break;
-	default:
-		throw std::exception("Invalid Generation Type");
-	}
+	ApplyMesh();
 }
 
 void AChunkBase::ApplyMesh() const
@@ -75,10 +47,24 @@ void AChunkBase::ApplyMesh() const
 		TArray<FProcMeshTangent>(),
 		true
 	);
+
+	Mesh->SetMaterial(1, MaterialColor);
+	Mesh->CreateMeshSection(
+		1,
+		MeshDataColor.Vertices,
+		MeshDataColor.Triangles,
+		MeshDataColor.Normals,
+		MeshDataColor.UVO,
+		MeshDataColor.Colors,
+		TArray<FProcMeshTangent>(),
+		true
+	);
 }
 
 void AChunkBase::ClearMesh()
 {
 	VertexCount = 0;
+	VertexCountColor = 0;
 	MeshData.Clear();
+	MeshDataColor.Clear();
 }

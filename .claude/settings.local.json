@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:minecraft.wiki)",
+      "WebFetch(domain:www.henrikkniberg.com)",
+      "WebFetch(domain:www.google.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/misode/mcmeta/1.21-data-json/data/minecraft/worldgen/noise_settings/overworld.json\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/misode/mcmeta/1.21-data-json/data/minecraft/worldgen/density_function/overworld/depth.json\")",
+      "Bash(curl -sL \"https://api.github.com/repos/misode/mcmeta/contents/data/minecraft/worldgen/density_function/overworld?ref=1.21-data-json\")",
+      "Bash(curl *)",
+      "WebFetch(domain:minecraft.fandom.com)",
+      "Bash(xargs wc -l)"
+    ]
+  }
+}
