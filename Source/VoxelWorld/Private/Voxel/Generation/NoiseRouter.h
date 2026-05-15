@@ -85,7 +85,8 @@ namespace MCWorldGen
 		TSharedPtr<const FNormalNoise> VegNoise;
 		TSharedPtr<const FNormalNoise> JaggedNoise;
 		TSharedPtr<const FNormalNoise> Base3DNoise;
-		TSharedPtr<const FNormalNoise> CaveCheeseNoise; // 仅在 bCavesEnabled 时有效
+		TSharedPtr<const FNormalNoise> CaveCheeseNoise;   // 仅在 bCavesEnabled 时有效
+		TSharedPtr<const FNormalNoise> CaveEntranceNoise; // 仅在 bCavesEnabled 时有效
 
 		// 密度函数树
 		FDensityRef ContinentalnessDF;

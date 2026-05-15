@@ -33,6 +33,9 @@ namespace MCWorldGen
 		// Cave Cheese：奶酪洞噪声。
 		extern const FNoiseDef CaveCheese;        // firstOctave  -8, [0.5, 1, 2, 1, 2, 1, 0, 2, 0]
 
+		// Cave Entrance：表层洞穴入口噪声。
+		extern const FNoiseDef CaveEntrance;      // firstOctave  -7, [0.4, 0.5, 1.0]
+
 		// Surface 表层规则用噪声。
 		extern const FNoiseDef Surface;           // firstOctave  -6, [1, 1, 1]
 		extern const FNoiseDef SurfaceSecondary;  // firstOctave  -6, [1, 1, 0, 1]

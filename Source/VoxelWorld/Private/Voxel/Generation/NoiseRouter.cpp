@@ -57,7 +57,8 @@ namespace MCWorldGen
 
 		if (bCavesEnabled)
 		{
-			CaveCheeseNoise = MakeNoise(Noises::CaveCheese);
+			CaveCheeseNoise   = MakeNoise(Noises::CaveCheese);
+			CaveEntranceNoise = MakeNoise(Noises::CaveEntrance);
 		}
 
 		// base_3d_noise 替代品：Mojang 用 BlendedNoise(0.25, 0.125, 80, 160, 8.0)，等效采样在
@@ -138,15 +139,31 @@ namespace MCWorldGen
 		// Cheese 洞穴：Mojang underground.cheese 项的 v1 简化（不含 spaghetti / pillar / cave_layer）。
 		//   cheese_term = clamp(0.27 + cave_noise, -1, 1) + clamp(1.5 - 0.64·sloped_cheese, 0, 0.5)
 		// 第二项在表层附近常驻 0.5 防止洞被挖到地表，深处 → 0 才允许 cave_noise 主导。
-		// final = min(sloped_cheese, cheese_term)：cheese_term < 0 时挖空。
+		// final = min(sloped_cheese, cheese_term, 5·entrance_term)：任一项 < 0 即挖空。
 		if (bCavesEnabled && CaveCheeseNoise.IsValid())
 		{
-			// Mojang noise(CAVE_CHEESE, 0.6666...) 表示 xz_scale=1, y_scale=0.6666 → y 方向稍稍拉伸。
+			// Cheese caves（地下大型空腔）：Mojang noise(CAVE_CHEESE, 0.6666) → xz=1, y=0.6666
 			const double CaveNoise = CaveCheeseNoise->Sample(Col.Wx * 1.0, Wy * 0.6666666666666666, Col.Wz * 1.0);
 			const double CheesePart1 = FMath::Clamp(0.27 + CaveNoise, -1.0, 1.0);
 			const double CheesePart2 = FMath::Clamp(1.5 - 0.64 * SlopedCheese, 0.0, 0.5);
 			const double CheeseTerm  = CheesePart1 + CheesePart2;
-			Density = FMath::Min(Density, CheeseTerm);
+
+			// Cave entrances（表层入口洞）：Mojang NoiseRouterData.entrances() 的 densityfunction7。
+			//   entrance = caveEntranceNoise(xz=0.75, y=0.5) + 0.37 + yClampedGradient(-10..30, 0.3..0.0)
+			// y-gradient：地下深处 (y≤-10) 加 +0.3 抑制入口；y≥30 不加偏置，让入口从 y=30 起切到地表。
+			// final 时再 ×5 让入口在表层 sloped_cheese≈0 时也能强力挖穿。
+			const double EntranceNoise = CaveEntranceNoise.IsValid()
+				? CaveEntranceNoise->Sample(Col.Wx * 0.75, Wy * 0.5, Col.Wz * 0.75)
+				: 1.0; // 不会触发 carve
+			double YEntranceGrad;
+			if (Wy <= -10.0)      YEntranceGrad = 0.3;
+			else if (Wy >= 30.0)  YEntranceGrad = 0.0;
+			else                  YEntranceGrad = 0.3 * (30.0 - Wy) / 40.0;
+			const double EntranceTerm = EntranceNoise + 0.37 + YEntranceGrad;
+
+			// 合并三个 carve 项（Mojang underground = min(cheese, entrances, spaghetti)；我们没 spaghetti）
+			const double CombinedCaves = FMath::Min(CheeseTerm, 5.0 * EntranceTerm);
+			Density = FMath::Min(Density, CombinedCaves);
 		}
 
 		return ApplySlide(Density, Wy);

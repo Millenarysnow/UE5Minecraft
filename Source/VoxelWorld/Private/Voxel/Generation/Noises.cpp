@@ -13,6 +13,7 @@ namespace MCWorldGen::Noises
 	const FNoiseDef Jagged            { TEXT("minecraft:jagged"),             FOctavedNoiseParameters(-16, {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}) };
 
 	const FNoiseDef CaveCheese        { TEXT("minecraft:cave_cheese"),        FOctavedNoiseParameters( -8, {0.5, 1.0, 2.0, 1.0, 2.0, 1.0, 0.0, 2.0, 0.0}) };
+	const FNoiseDef CaveEntrance      { TEXT("minecraft:cave_entrance"),      FOctavedNoiseParameters( -7, {0.4, 0.5, 1.0}) };
 
 	const FNoiseDef Surface           { TEXT("minecraft:surface"),            FOctavedNoiseParameters( -6, {1.0, 1.0, 1.0}) };
 	const FNoiseDef SurfaceSecondary  { TEXT("minecraft:surface_secondary"),  FOctavedNoiseParameters( -6, {1.0, 1.0, 0.0, 1.0}) };
