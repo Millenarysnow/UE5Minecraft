@@ -19,6 +19,7 @@ void UWorldGenerator::EnsureRouter()
 		Router = MakeUnique<FNoiseRouter>(static_cast<uint64>(WorldSeed), bEnableCaves);
 		SurfaceSystem = MakeUnique<MCWorldGen::FSurfaceSystem>(static_cast<uint64>(WorldSeed));
 		BiomeSource = MakeUnique<MCWorldGen::FBiomeSource>();
+		FeaturePlacer = MakeUnique<MCWorldGen::FFeaturePlacer>(static_cast<uint64>(WorldSeed));
 		RouterSeed = WorldSeed;
 	}
 }
@@ -186,6 +187,24 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 				OutBlocks[Idx] = Column[lz];
 			}
 		}
+	}
+
+	// Pass 3：特征放置（v1 仅树）。需要全部主体方块都已写入 OutBlocks，所以放在 column 循环之后。
+	// 调试 biome 着色模式下不种树，专心看 biome 分布。
+	if (!bDebugBiomeColors)
+	{
+		// chunk 中心 biome 决定本 chunk 树的种类与数量
+		const double CenterMcX = static_cast<double>(ChunkOriginWorldVoxel.X + ChunkSize / 2);
+		const double CenterMcZ = static_cast<double>(ChunkOriginWorldVoxel.Y + ChunkSize / 2);
+		const EBiome ChunkBiome = BiomeSource->SampleBiome(
+			Router->Continentalness(CenterMcX, CenterMcZ),
+			Router->ErosionVal(CenterMcX, CenterMcZ),
+			Router->RidgesFolded(CenterMcX, CenterMcZ),
+			Router->Temperature(CenterMcX, CenterMcZ),
+			Router->Humidity(CenterMcX, CenterMcZ),
+			0.0
+		);
+		FeaturePlacer->PlaceFeatures(ChunkOriginWorldVoxel, ChunkSize, ChunkBiome, OutBlocks);
 	}
 }
 

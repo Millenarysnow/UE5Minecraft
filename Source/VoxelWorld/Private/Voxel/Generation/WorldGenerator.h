@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Voxel/Generation/BiomeSource.h"
+#include "Voxel/Generation/FeaturePlacer.h"
 #include "Voxel/Generation/NoiseRouter.h"
 #include "Voxel/Generation/SurfaceSystem.h"
 #include "Voxel/Utils/Enums.h"
@@ -50,6 +51,7 @@ private:
 	TUniquePtr<MCWorldGen::FNoiseRouter> Router;
 	TUniquePtr<MCWorldGen::FSurfaceSystem> SurfaceSystem;
 	TUniquePtr<MCWorldGen::FBiomeSource> BiomeSource;
+	TUniquePtr<MCWorldGen::FFeaturePlacer> FeaturePlacer;
 	int64 RouterSeed = 0;
 	bool bSmokeTested = false;
 	bool bPhase2Logged = false;
