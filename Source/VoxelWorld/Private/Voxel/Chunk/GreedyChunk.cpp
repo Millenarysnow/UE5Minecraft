@@ -97,17 +97,32 @@ void AGreedyChunk::GenerateMesh()
 					const bool CurrentBlockOpaque = CurrentBlock != EBlock::Air;
 					const bool CompareBlockOpaque = CompareBlock != EBlock::Air;
 
+					// 只为 in-chunk 的方块生成面 —— OOB 邻居的面交给邻居 chunk 自己生成。
+					// OOB 查询保留是为了"两边都 opaque 时不生成面"的边界剔除效果。
+					const FIntVector CompareItr = ChunkItr + AxisMask;
+					const bool bCurrentInChunk = ChunkItr.X >= 0 && ChunkItr.X < Size
+						&& ChunkItr.Y >= 0 && ChunkItr.Y < Size
+						&& ChunkItr.Z >= 0 && ChunkItr.Z < Size;
+					const bool bCompareInChunk = CompareItr.X >= 0 && CompareItr.X < Size
+						&& CompareItr.Y >= 0 && CompareItr.Y < Size
+						&& CompareItr.Z >= 0 && CompareItr.Z < Size;
+
 					if (CurrentBlockOpaque == CompareBlockOpaque)
 					{
 						Mask[N++] = FMask { EBlock::Null, 0 };
 					}
-					else if (CurrentBlockOpaque)
+					else if (CurrentBlockOpaque && bCurrentInChunk)
 					{
 						Mask[N++] = FMask { CurrentBlock, 1};
 					}
-					else
+					else if (CompareBlockOpaque && bCompareInChunk)
 					{
 						Mask[N++] = FMask { CompareBlock, -1};
+					}
+					else
+					{
+						// opaque 那一侧在 OOB → 不在本 chunk 生成面（让邻居自己出面）
+						Mask[N++] = FMask { EBlock::Null, 0 };
 					}
 				}
 			}
@@ -247,10 +262,22 @@ int AGreedyChunk::GetBlockIndex(int X, int Y, int Z) const
 
 EBlock AGreedyChunk::GetBlock(FIntVector Index) const
 {
-	if (Index.X < 0 || Index.Y < 0 || Index.Z < 0 || Index.X >= Size || Index.Y >= Size || Index.Z >= Size)
-		return EBlock::Air;
+	// 在本 chunk 内：直接读 Blocks 数组
+	if (Index.X >= 0 && Index.Y >= 0 && Index.Z >= 0 && Index.X < Size && Index.Y < Size && Index.Z < Size)
+	{
+		return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
+	}
 
-	return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
+	// 跨 chunk 边界（OOB）：问 WorldGenerator 这个世界坐标处是不是固体。
+	// 如果是固体（stone / sea water / 等），返回 Stone 让 greedy meshing 把这个边界面剔掉；
+	// 否则返回 Air 让本 chunk 的方块生成对外的可见面。
+	UWorldGenerator* Gen = UWorldGenerator::Get(GetWorld());
+	if (Gen)
+	{
+		const FIntVector WorldVoxel = ChunkOriginVoxel + Index;
+		return Gen->IsBlockSolidAt(WorldVoxel) ? EBlock::Stone : EBlock::Air;
+	}
+	return EBlock::Air; // 兜底
 }
 
 bool AGreedyChunk::CompareMask(FMask M1, FMask M2) const

@@ -28,6 +28,7 @@ void AMyGameModeBase::BeginPlay()
 	{
 		WorldGen->WorldSeed = EffectiveSeed;
 		WorldGen->bEnableCaves = bEnableCaves;
+		WorldGen->ContinentBias = static_cast<double>(ContinentBias);
 		WorldGen->bDebugBiomeColors = bDebugBiomeColors;
 	}
 

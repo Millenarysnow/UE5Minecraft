@@ -43,6 +43,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "World")
 	bool bEnableCaves = true;
 
+	// 整体抬升 offset，让大部分 plains 浮出海平面。0 = Mojang 真值（plains surface 多在 sea level 附近，大部分 underwater）。
+	// 推荐 0.1 让 plains surface 抬到 ~y=77，明显成"陆地"。
+	UPROPERTY(EditAnywhere, Category = "World", meta = (ClampMin = "-0.3", ClampMax = "0.3"))
+	float ContinentBias = 0.1f;
+
 	// 调试：开启后表层方块按 biome 着色（top + 几层全替换为该 biome 的"标记块"），
 	// 便于从空中肉眼验证 biome 分布。正常游玩时关掉。
 	UPROPERTY(EditAnywhere, Category = "Debug")

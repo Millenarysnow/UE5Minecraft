@@ -33,11 +33,18 @@ public:
 	// 由 MyGameMode 传入。
 	bool bEnableCaves = true;
 
+	// 由 MyGameMode 传入。整体抬升 offset，让 plains 浮出水面（默认 0 = Mojang 真值）。
+	double ContinentBias = 0.0;
+
 	// 调试：开启后表层方块按 biome 着色。由 MyGameMode 在 BeginPlay 设置。
 	bool bDebugBiomeColors = false;
 
 	/// 填充一个 chunk 的体素数据。ChunkSize^3 个方块。
 	void FillChunk(const FIntVector& ChunkOriginWorldVoxel, int ChunkSize, TArray<EBlock>& OutBlocks);
+
+	/// 单点查询：(WorldVoxel) 处的方块是不是 opaque（用于 chunk 边界面剔除）。
+	/// 仅判断 stone-or-not + bedrock，不跑完整 surface / cave-water 流程，专为 GreedyChunk OOB 邻居查询用。
+	bool IsBlockSolidAt(const FIntVector& WorldVoxel);
 
 	UFUNCTION(BlueprintCallable)
 	static UWorldGenerator* Get(const UObject* WorldContextObject);

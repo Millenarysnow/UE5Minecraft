@@ -16,7 +16,7 @@ void UWorldGenerator::EnsureRouter()
 {
 	if (!Router.IsValid() || RouterSeed != WorldSeed)
 	{
-		Router = MakeUnique<FNoiseRouter>(static_cast<uint64>(WorldSeed), bEnableCaves);
+		Router = MakeUnique<FNoiseRouter>(static_cast<uint64>(WorldSeed), bEnableCaves, ContinentBias);
 		SurfaceSystem = MakeUnique<MCWorldGen::FSurfaceSystem>(static_cast<uint64>(WorldSeed));
 		BiomeSource = MakeUnique<MCWorldGen::FBiomeSource>();
 		FeaturePlacer = MakeUnique<MCWorldGen::FFeaturePlacer>(static_cast<uint64>(WorldSeed));
@@ -140,6 +140,7 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 			{
 				// 跨越过渡区域：自上而下逐 y 评估密度。带状态机区分 sea Water / cave Air。
 				bool bSeenStone = bSeenStoneInit;
+				bool bAnyStoneInChunk = false;
 				for (int lz = ChunkSize - 1; lz >= 0; --lz)
 				{
 					const int worldUEz = ChunkYMin + lz; // UE.Z = MC.Y
@@ -152,11 +153,13 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 					{
 						Block = EBlock::Bedrock;
 						bSeenStone = true;
+						bAnyStoneInChunk = true;
 					}
 					else if (Density > 0.0)
 					{
 						Block = EBlock::Stone;
 						bSeenStone = true;
+						bAnyStoneInChunk = true;
 					}
 					else if (bSeenStone)
 					{
@@ -170,6 +173,17 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 					}
 
 					Column[lz] = Block;
+				}
+
+				// 边界 case：本 chunk 整列都没 stone，但估算 surface 比 chunk 顶高 →
+				// 说明这一列被 cave entrance / 大型空腔从顶到底挖穿，y ≤ 63 的部分被错判成 sea Water。
+				// 全部转成 cave Air。
+				if (!bAnyStoneInChunk && static_cast<double>(ChunkYMax) < EstimatedSurface)
+				{
+					for (int lz = 0; lz < ChunkSize; ++lz)
+					{
+						if (Column[lz] == EBlock::Water) Column[lz] = EBlock::Air;
+					}
 				}
 			}
 
@@ -213,6 +227,44 @@ UWorldGenerator* UWorldGenerator::Get(const UObject* WorldContextObject)
 	if (!WorldContextObject) return nullptr;
 	UGameInstance* GameInstance = WorldContextObject->GetWorld()->GetGameInstance();
 	return GameInstance ? GameInstance->GetSubsystem<UWorldGenerator>() : nullptr;
+}
+
+bool UWorldGenerator::IsBlockSolidAt(const FIntVector& WorldVoxel)
+{
+	EnsureRouter();
+	if (!Router.IsValid()) return false;
+
+	// y == MinY 永远是 bedrock
+	if (WorldVoxel.Z == FNoiseRouter::MinY) return true;
+	// y < MinY 或 y > MaxY 不算固体
+	if (WorldVoxel.Z < FNoiseRouter::MinY) return false;
+	if (WorldVoxel.Z > FNoiseRouter::MaxY) return false;
+
+	// UE 坐标系 → MC 坐标系（UE.Y → MC.Z, UE.Z → MC.Y）
+	const double McX = static_cast<double>(WorldVoxel.X);
+	const double McZ = static_cast<double>(WorldVoxel.Y);
+	const double McY = static_cast<double>(WorldVoxel.Z);
+
+	const FNoiseRouter::FColumnState Col = Router->BuildColumn(McX, McZ);
+	const FNoiseRouter::FColumnBounds Bounds = Router->EstimateColumnBounds(Col);
+
+	// 一定 stone（仅在 caves 关闭时安全）
+	if (WorldVoxel.Z <= Bounds.StoneYMax && !Router->AreCavesEnabled()) return true;
+
+	// 算密度
+	const double Density = Router->DensityInColumn(Col, McY);
+	if (Density > 0.0) return true; // stone / 表层方块
+
+	// density ≤ 0：可能是 cave Air、sea Water 或 sky Air。Greedy meshing 把 Water 也当 opaque，
+	// 所以这里需要分辨 sea Water vs cave Air。
+	const double EstimatedSurface = static_cast<double>(FNoiseRouter::MinY) + 128.0 * (1.5 + Col.Offset);
+	if (static_cast<double>(WorldVoxel.Z) < EstimatedSurface)
+	{
+		// 估算 surface 之下：要么是 stone（已经处理），要么是 cave Air → 非固体
+		return false;
+	}
+	// surface 之上：海里 (Water, opaque) 或天空 (Air, 透明)
+	return WorldVoxel.Z <= FNoiseRouter::SeaLevel;
 }
 
 void UWorldGenerator::LogPhase1SmokeTest() const

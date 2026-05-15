@@ -23,7 +23,7 @@ namespace MCWorldGen
 	class FNoiseRouter
 	{
 	public:
-		explicit FNoiseRouter(uint64 WorldSeed, bool bEnableCaves = true);
+		explicit FNoiseRouter(uint64 WorldSeed, bool bEnableCaves = true, double ContinentBias = 0.0);
 
 		// Mojang 默认值：海平面 63，世界 y ∈ [-64, 320]，高度 384。
 		static constexpr int SeaLevel  = 63;

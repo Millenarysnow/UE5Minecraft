@@ -40,7 +40,7 @@ namespace MCWorldGen
 		}
 	}
 
-	FNoiseRouter::FNoiseRouter(uint64 WorldSeed, bool bEnableCaves)
+	FNoiseRouter::FNoiseRouter(uint64 WorldSeed, bool bEnableCaves, double ContinentBias)
 		: bCavesEnabled(bEnableCaves)
 	{
 		auto MakeNoise = [WorldSeed](const FNoiseDef& Def) -> TSharedRef<const FNormalNoise>
@@ -91,7 +91,7 @@ namespace MCWorldGen
 		FCubicSpline FactorSpline     = TerrainSplines::BuildFactor(ContinentalnessDF, ErosionDF, RidgesDF, RidgesFoldedDF);
 		FCubicSpline JaggednessSpline = TerrainSplines::BuildJaggedness(ContinentalnessDF, ErosionDF, RidgesDF, RidgesFoldedDF);
 
-		OffsetDF     = DF::Add(DF::Constant(GLOBAL_OFFSET), DF::Spline(MoveTemp(OffsetSpline)));
+		OffsetDF     = DF::Add(DF::Constant(GLOBAL_OFFSET + ContinentBias), DF::Spline(MoveTemp(OffsetSpline)));
 		FactorDF     = DF::Spline(MoveTemp(FactorSpline));
 		JaggednessDF = DF::Spline(MoveTemp(JaggednessSpline));
 	}
