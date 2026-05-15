@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Full project docs
+
+**Read [`docs/README.md`](docs/README.md) first** for the navigation index. The `docs/` folder has:
+- `ARCHITECTURE.md` — detailed code structure, module responsibilities, runtime flow
+- `PIPELINE.md` — terrain generation algorithms, formulas, spline anchors, biome thresholds, etc.
+- `EDITOR_SETUP.md` — manual UE editor setup (materials, BP_MyGameMode config)
+- `STATUS.md` — phase-by-phase progress, known limitations, roadmap
+
+This `CLAUDE.md` is the high-level summary. For depth, go to `docs/`.
+
 ## Project Overview
 
 Unreal Engine **5.4.4** project (`VoxelWorld.uproject`) — a Minecraft-style voxel world. C++ module name: `VoxelWorld`. Default map: `Content/_Game/Maps/TestMap.umap`.

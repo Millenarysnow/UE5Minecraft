@@ -4,6 +4,7 @@
 #include "Game/MyGameModeBase.h"
 
 #include "Voxel/ChunkWorldSubsystem.h"
+#include "Voxel/CloudLayer.h"
 #include "Voxel/Generation/WorldGenerator.h"
 
 void AMyGameModeBase::BeginPlay()
@@ -46,6 +47,27 @@ void AMyGameModeBase::BeginPlay()
 	ChunkWorldSubsystem->Size = Size;
 	ChunkWorldSubsystem->MinWorldY = MinWorldY;
 	ChunkWorldSubsystem->MaxWorldY = MaxWorldY;
+	ChunkWorldSubsystem->MaxSpawnsPerTick = MaxSpawnsPerTick;
+	ChunkWorldSubsystem->StreamingTickInterval = StreamingTickInterval;
 
 	ChunkWorldSubsystem->StartStreaming();
+
+	// 自动 spawn 云层（如果开关开着）
+	if (bSpawnClouds)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ACloudLayer* Clouds = GetWorld()->SpawnActor<ACloudLayer>(
+			ACloudLayer::StaticClass(),
+			FVector(0, 0, CloudHeight * 100.f),
+			FRotator::ZeroRotator,
+			SpawnParams
+		);
+		if (Clouds)
+		{
+			Clouds->CloudMaterial = CloudMaterial;
+			Clouds->CloudHeight = CloudHeight;
+			Clouds->WindSpeedBlocksPerSec = CloudWindSpeedBlocksPerSec;
+		}
+	}
 }
