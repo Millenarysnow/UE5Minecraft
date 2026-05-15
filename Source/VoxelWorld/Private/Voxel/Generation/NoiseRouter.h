@@ -23,13 +23,15 @@ namespace MCWorldGen
 	class FNoiseRouter
 	{
 	public:
-		explicit FNoiseRouter(uint64 WorldSeed);
+		explicit FNoiseRouter(uint64 WorldSeed, bool bEnableCaves = true);
 
 		// Mojang 默认值：海平面 63，世界 y ∈ [-64, 320]，高度 384。
 		static constexpr int SeaLevel  = 63;
 		static constexpr int MinY      = -64;
 		static constexpr int MaxY      = 320;
 		static constexpr int Height    = MaxY - MinY; // 384
+
+		bool AreCavesEnabled() const { return bCavesEnabled; }
 
 		// 单点 climate samplers（MC 块坐标系；不依赖 Y）。
 		double Continentalness(double Wx, double Wz) const { return ContinentalnessDF->Compute(Wx, 0.0, Wz); }
@@ -62,6 +64,18 @@ namespace MCWorldGen
 		// 在已计算的列缓存上对单个 y 求 final_density。Hot loop 走这个。
 		double DensityInColumn(const FColumnState& Col, double Wy) const;
 
+		// 解析估计本列的密度过渡 y 区间，用于跳过完全在 stone 或完全在 air 一侧的 chunk。
+		//   y <= StoneYMax  → 一定 stone（base3D 影响翻不了号）
+		//   y >= AirYMin    → 一定 air
+		//   StoneYMax < y < AirYMin → 必须走逐 y 密度评估
+		// 只看 offset / factor 两个 spline 输出，不算 base3D（很便宜）。
+		struct FColumnBounds
+		{
+			int StoneYMax;
+			int AirYMin;
+		};
+		FColumnBounds EstimateColumnBounds(const FColumnState& Col) const;
+
 	private:
 		// 噪声实例
 		TSharedPtr<const FNormalNoise> ContinentNoise;
@@ -71,6 +85,7 @@ namespace MCWorldGen
 		TSharedPtr<const FNormalNoise> VegNoise;
 		TSharedPtr<const FNormalNoise> JaggedNoise;
 		TSharedPtr<const FNormalNoise> Base3DNoise;
+		TSharedPtr<const FNormalNoise> CaveCheeseNoise; // 仅在 bCavesEnabled 时有效
 
 		// 密度函数树
 		FDensityRef ContinentalnessDF;
@@ -83,5 +98,7 @@ namespace MCWorldGen
 		FDensityRef OffsetDF;
 		FDensityRef FactorDF;
 		FDensityRef JaggednessDF;
+
+		bool bCavesEnabled = true;
 	};
 }

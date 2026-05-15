@@ -10,10 +10,24 @@ void AMyGameModeBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// WorldSeed 约定：0 → 用当前系统时间生成随机种子；非 0 → 显式种子（用于可重现）。
+	// 实际使用的种子会打印到日志，方便复现一个看着不错的世界。
+	int64 EffectiveSeed = WorldSeed;
+	if (EffectiveSeed == 0)
+	{
+		EffectiveSeed = static_cast<int64>(FDateTime::Now().GetTicks());
+		UE_LOG(LogTemp, Warning, TEXT("[WorldGen] WorldSeed=0 → auto seed: %lld"), EffectiveSeed);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[WorldGen] Using explicit WorldSeed: %lld"), WorldSeed);
+	}
+
 	UWorldGenerator* WorldGen = UWorldGenerator::Get(GetWorld());
 	if (WorldGen)
 	{
-		WorldGen->WorldSeed = WorldSeed;
+		WorldGen->WorldSeed = EffectiveSeed;
+		WorldGen->bDebugBiomeColors = bDebugBiomeColors;
 	}
 
 	UChunkWorldSubsystem* ChunkWorldSubsystem = UChunkWorldSubsystem::Get(GetWorld());

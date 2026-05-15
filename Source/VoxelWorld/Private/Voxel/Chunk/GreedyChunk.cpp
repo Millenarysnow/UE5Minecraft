@@ -30,12 +30,15 @@ namespace
 		case EBlock::Sandstone:   return FColor(200, 175, 110, 255); // 沙岩
 		case EBlock::Snow:        return FColor(245, 245, 255, 255); // 雪白带蓝
 		case EBlock::Water:       return FColor( 60, 110, 200, 255); // 水蓝
-		case EBlock::Bedrock:     return FColor( 40,  40,  45, 255); // 近黑
+		case EBlock::Bedrock:     return FColor(  6,   6,   8, 255); // 近黑（经 ACES tonemapping 后仍是深色）
 		case EBlock::CoalOre:     return FColor( 60,  60,  60, 255); // 暗灰
 		case EBlock::IronOre:     return FColor(180, 140, 100, 255); // 铁锈
 		case EBlock::DiamondOre:  return FColor(130, 220, 220, 255); // 钻石青
 		case EBlock::SpruceLog:   return FColor( 90,  60,  30, 255); // 深棕
 		case EBlock::SpruceLeaf:  return FColor( 40, 100,  50, 255); // 深绿
+		// 调试 biome 标记
+		case EBlock::DebugBiomePlains:    return FColor( 90, 200,  90, 255); // 鲜绿（Plains 调试）
+		case EBlock::DebugBiomeMountains: return FColor(130, 130, 135, 255); // 中灰（Mountains 调试）
 		default:                  return FColor(255,   0, 255, 255); // 洋红 = 未配置
 		}
 	}

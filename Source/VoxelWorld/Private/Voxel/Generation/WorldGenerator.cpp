@@ -18,6 +18,7 @@ void UWorldGenerator::EnsureRouter()
 	{
 		Router = MakeUnique<FNoiseRouter>(static_cast<uint64>(WorldSeed));
 		SurfaceSystem = MakeUnique<MCWorldGen::FSurfaceSystem>(static_cast<uint64>(WorldSeed));
+		BiomeSource = MakeUnique<MCWorldGen::FBiomeSource>();
 		RouterSeed = WorldSeed;
 	}
 }
@@ -54,41 +55,90 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 			const double McX = static_cast<double>(ChunkOriginWorldVoxel.X + lx); // UE.X → MC.X
 
 			const FNoiseRouter::FColumnState Col = Router->BuildColumn(McX, McZ);
+			const FNoiseRouter::FColumnBounds Bounds = Router->EstimateColumnBounds(Col);
+
+			const int ChunkYMin = ChunkOriginWorldVoxel.Z;
+			const int ChunkYMax = ChunkOriginWorldVoxel.Z + ChunkSize - 1;
+
+			// 计算本列的 biome（一次，整列共用 —— v1 不支持垂直 biome 分层）。
+			// Depth 在 Mojang 是 y-相关量，但仅用于 cave biomes，我们 v1 不接，传 0。
+			const EBiome Biome = BiomeSource->SampleBiome(
+				Router->Continentalness(McX, McZ),
+				Router->ErosionVal(McX, McZ),
+				Router->RidgesFolded(McX, McZ),
+				Router->Temperature(McX, McZ),
+				Router->Humidity(McX, McZ),
+				0.0
+			);
 
 			// Pass 1：density → 主体方块（stone / water / air / bedrock）。
-			for (int lz = 0; lz < ChunkSize; ++lz)
+			// 快速路径：本 chunk 完全在 stone 或 air 一侧 → 跳过逐 y 评估。
+			if (ChunkYMax <= Bounds.StoneYMax)
 			{
-				const int worldUEz = ChunkOriginWorldVoxel.Z + lz; // UE.Z = MC.Y
-				const double McY = static_cast<double>(worldUEz);
-
-				const double Density = Router->DensityInColumn(Col, McY);
-
-				EBlock Block;
-				if (worldUEz == FNoiseRouter::MinY)
+				// 全 stone。
+				for (int lz = 0; lz < ChunkSize; ++lz)
 				{
-					Block = EBlock::Bedrock;
+					const int worldUEz = ChunkYMin + lz;
+					Column[lz] = (worldUEz == FNoiseRouter::MinY) ? EBlock::Bedrock : EBlock::Stone;
 				}
-				else if (Density > 0.0)
+			}
+			else if (ChunkYMin >= Bounds.AirYMin)
+			{
+				// 全 air / water（依 y 跟 sea level 比）。
+				for (int lz = 0; lz < ChunkSize; ++lz)
 				{
-					Block = EBlock::Stone;
+					const int worldUEz = ChunkYMin + lz;
+					Column[lz] = (worldUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
 				}
-				else
+			}
+			else
+			{
+				// 跨越过渡区域：逐 y 评估密度。
+				for (int lz = 0; lz < ChunkSize; ++lz)
 				{
-					Block = (worldUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
-				}
+					const int worldUEz = ChunkYMin + lz; // UE.Z = MC.Y
+					const double McY = static_cast<double>(worldUEz);
 
-				Column[lz] = Block;
+					const double Density = Router->DensityInColumn(Col, McY);
+
+					EBlock Block;
+					if (worldUEz == FNoiseRouter::MinY)
+					{
+						Block = EBlock::Bedrock;
+					}
+					else if (Density > 0.0)
+					{
+						Block = EBlock::Stone;
+					}
+					else
+					{
+						Block = (worldUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
+					}
+
+					Column[lz] = Block;
+				}
 			}
 
 			// Pass 2：表层规则（grass / dirt / sand 替换最顶层 stone）。
 			// 多采样一次"本 chunk 顶面再上一格"的密度，让表层判断能够覆盖 lz=ChunkSize-1 是 stone 的边界 case。
 			const int AboveChunkUEz = ChunkOriginWorldVoxel.Z + ChunkSize;
-			const double AboveDensity = Router->DensityInColumn(Col, static_cast<double>(AboveChunkUEz));
 			EBlock BlockAbove;
-			if (AboveDensity > 0.0)                                    BlockAbove = EBlock::Stone;
-			else if (AboveChunkUEz <= FNoiseRouter::SeaLevel)          BlockAbove = EBlock::Water;
-			else                                                        BlockAbove = EBlock::Air;
-			SurfaceSystem->ApplyColumn(McX, McZ, ChunkOriginWorldVoxel.Z, BlockAbove, Column);
+			if (AboveChunkUEz <= Bounds.StoneYMax)
+			{
+				BlockAbove = EBlock::Stone;
+			}
+			else if (AboveChunkUEz >= Bounds.AirYMin)
+			{
+				BlockAbove = (AboveChunkUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
+			}
+			else
+			{
+				const double AboveDensity = Router->DensityInColumn(Col, static_cast<double>(AboveChunkUEz));
+				if (AboveDensity > 0.0)                                    BlockAbove = EBlock::Stone;
+				else if (AboveChunkUEz <= FNoiseRouter::SeaLevel)          BlockAbove = EBlock::Water;
+				else                                                        BlockAbove = EBlock::Air;
+			}
+			SurfaceSystem->ApplyColumn(McX, McZ, ChunkOriginWorldVoxel.Z, Biome, BlockAbove, bDebugBiomeColors, Column);
 
 			// 写回三维 OutBlocks。
 			for (int lz = 0; lz < ChunkSize; ++lz)
@@ -158,9 +208,24 @@ void UWorldGenerator::LogPhase2SmokeTest()
 		const double Off  = Router->Offset(Wx, Wz);
 		const double Fac  = Router->Factor(Wx, Wz);
 		const double Jag  = Router->Jaggedness(Wx, Wz);
+		const double Tem  = Router->Temperature(Wx, Wz);
+		const double Hum  = Router->Humidity(Wx, Wz);
+		const EBiome Biome = BiomeSource->SampleBiome(Cont, Ero, Pv, Tem, Hum, 0.0);
+
+		const TCHAR* BiomeName = TEXT("?");
+		switch (Biome)
+		{
+		case EBiome::Ocean:        BiomeName = TEXT("Ocean");       break;
+		case EBiome::Plains:       BiomeName = TEXT("Plains");      break;
+		case EBiome::Forest:       BiomeName = TEXT("Forest");      break;
+		case EBiome::Desert:       BiomeName = TEXT("Desert");      break;
+		case EBiome::SnowyPlains:  BiomeName = TEXT("SnowyPlains"); break;
+		case EBiome::Mountains:    BiomeName = TEXT("Mountains");   break;
+		}
+
 		UE_LOG(LogTemp, Display,
-			TEXT("[Phase2] %s @(%.0f,%.0f) cont=%.3f ero=%.3f ridge=%.3f pv=%.3f | off=%.3f fac=%.3f jag=%.3f"),
-			Label, Wx, Wz, Cont, Ero, Rid, Pv, Off, Fac, Jag);
+			TEXT("[Phase2] %s @(%.0f,%.0f) cont=%.3f ero=%.3f ridge=%.3f pv=%.3f T=%.3f H=%.3f | off=%.3f fac=%.3f jag=%.3f | biome=%s"),
+			Label, Wx, Wz, Cont, Ero, Rid, Pv, Tem, Hum, Off, Fac, Jag, BiomeName);
 
 		// 也打几条垂直 density profile，方便看 surface y
 		const FNoiseRouter::FColumnState Col = Router->BuildColumn(Wx, Wz);

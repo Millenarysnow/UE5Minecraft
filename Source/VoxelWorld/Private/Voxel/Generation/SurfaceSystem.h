@@ -26,10 +26,12 @@ namespace MCWorldGen
 		/// 在一个 chunk 的 (x,z) 列上应用表层规则。
 		/// @param Wx, Wz       MC 块坐标
 		/// @param ChunkOriginY lz=0 对应的 MC 块 Y
+		/// @param Biome        本列对应的生物群系；决定 grass / sand / snow 派发
 		/// @param BlockAbove   本 chunk 顶部 (lz=ChunkSize) 上方一格的方块；用于判断顶端 stone
 		///                     是否真的暴露在 air/water 下。如果未知传 EBlock::Stone（保守跳过）。
+		/// @param bDebugBiomeColors 开启后 top + under 全部用同一个 biome 标记块，便于肉眼验证 biome
 		/// @param ColumnView   该列的 EBlock 数组（长度 = ChunkSize），原地修改
-		void ApplyColumn(double Wx, double Wz, int ChunkOriginY, EBlock BlockAbove, TArrayView<EBlock> ColumnView) const;
+		void ApplyColumn(double Wx, double Wz, int ChunkOriginY, EBiome Biome, EBlock BlockAbove, bool bDebugBiomeColors, TArrayView<EBlock> ColumnView) const;
 
 	private:
 		TSharedPtr<const FNormalNoise> SurfaceNoise;

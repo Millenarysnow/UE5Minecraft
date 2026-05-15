@@ -135,4 +135,43 @@ namespace MCWorldGen
 		const FColumnState Col = BuildColumn(Wx, Wz);
 		return DensityInColumn(Col, Wy);
 	}
+
+	FNoiseRouter::FColumnBounds FNoiseRouter::EstimateColumnBounds(const FColumnState& Col) const
+	{
+		// density(y) = 4 * qn((depth(y) + jagTerm) * factor) + base3D
+		//   depth(y) = ygrad(y) + offset，ygrad(y) = 1.5 - 3·(y+64)/384 = 1.5 - (y+64)/128
+		//   |jagTerm| ≤ |jaggedness|（半负），但 jaggedness 通常很小，可忽略
+		//   |base3D| 上界用经验值 2.5（5 octave NormalNoise 的实际典型上限）
+		//
+		// 必为 stone：4·qn(inner) > +base3D_max
+		//   inner > base3D_max / 4 = 0.625（因为 inner > 0 时 qn(inner)=inner）
+		//   depth · factor > 0.625
+		//   depth > 0.625 / factor
+		// 必为 air：4·qn(inner) < -base3D_max
+		//   inner negative path：4·qn(inner) = inner，需 inner < -base3D_max
+		//   depth · factor < -base3D_max
+		//   depth < -base3D_max / factor
+
+		constexpr double Base3DMax = 2.5;
+
+		// 防御性：factor 不应为 0 或负，但加点保护
+		const double F = FMath::Max(Col.Factor, 0.01);
+
+		const double DepthStone = Base3DMax * 0.25 / F; // depth 阈值，超过就一定 stone
+		const double DepthAir   = -Base3DMax / F;       // depth 阈值，低于就一定 air
+
+		// depth = ygrad + offset，ygrad = 1.5 - (y+64)/128
+		//   solve depth > DepthStone → 1.5 - (y+64)/128 + offset > DepthStone
+		//                            → y < 128·(1.5 + offset - DepthStone) - 64
+		//   solve depth < DepthAir   → y > 128·(1.5 + offset - DepthAir) - 64
+		const double KStone = 128.0 * (1.5 + Col.Offset - DepthStone) - 64.0;
+		const double KAir   = 128.0 * (1.5 + Col.Offset - DepthAir)   - 64.0;
+
+		FColumnBounds B;
+		// floor 取整保证 "y <= StoneYMax 必为 stone"。
+		B.StoneYMax = static_cast<int>(FMath::FloorToDouble(KStone));
+		// ceil 取整保证 "y >= AirYMin 必为 air"。
+		B.AirYMin   = static_cast<int>(FMath::CeilToDouble(KAir));
+		return B;
+	}
 }

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Voxel/Generation/BiomeSource.h"
 #include "Voxel/Generation/NoiseRouter.h"
 #include "Voxel/Generation/SurfaceSystem.h"
 #include "Voxel/Utils/Enums.h"
@@ -28,6 +29,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "WorldGen")
 	int64 WorldSeed = 0;
 
+	// 调试：开启后表层方块按 biome 着色。由 MyGameMode 在 BeginPlay 设置。
+	bool bDebugBiomeColors = false;
+
 	/// 填充一个 chunk 的体素数据。ChunkSize^3 个方块。
 	void FillChunk(const FIntVector& ChunkOriginWorldVoxel, int ChunkSize, TArray<EBlock>& OutBlocks);
 
@@ -42,6 +46,7 @@ private:
 
 	TUniquePtr<MCWorldGen::FNoiseRouter> Router;
 	TUniquePtr<MCWorldGen::FSurfaceSystem> SurfaceSystem;
+	TUniquePtr<MCWorldGen::FBiomeSource> BiomeSource;
 	int64 RouterSeed = 0;
 	bool bSmokeTested = false;
 	bool bPhase2Logged = false;
