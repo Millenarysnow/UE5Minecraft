@@ -46,5 +46,5 @@ void AMyGameModeBase::BeginPlay()
 	ChunkWorldSubsystem->MinWorldY = MinWorldY;
 	ChunkWorldSubsystem->MaxWorldY = MaxWorldY;
 
-	ChunkWorldSubsystem->GenerateWorld();
+	ChunkWorldSubsystem->StartStreaming();
 }
