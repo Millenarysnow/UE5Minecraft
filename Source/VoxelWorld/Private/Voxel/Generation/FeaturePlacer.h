@@ -29,6 +29,9 @@ namespace MCWorldGen
 	private:
 		uint64 WorldSeed;
 
+		void PlaceTrees(const FIntVector& ChunkOriginVoxel, int ChunkSize, EBiome ChunkBiome, TArray<EBlock>& OutBlocks) const;
+		void PlaceOres(const FIntVector& ChunkOriginVoxel, int ChunkSize, TArray<EBlock>& OutBlocks) const;
+
 		void PlaceOak(int lx, int ly, int topLz, int ChunkSize, TArray<EBlock>& OutBlocks, FRandomStream& Rng) const;
 		void PlaceSpruce(int lx, int ly, int topLz, int ChunkSize, TArray<EBlock>& OutBlocks, FRandomStream& Rng) const;
 	};

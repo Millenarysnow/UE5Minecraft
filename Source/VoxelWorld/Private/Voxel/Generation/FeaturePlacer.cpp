@@ -51,12 +51,19 @@ namespace MCWorldGen
 
 	void FFeaturePlacer::PlaceFeatures(const FIntVector& ChunkOriginVoxel, int ChunkSize, EBiome ChunkBiome, TArray<EBlock>& OutBlocks) const
 	{
+		PlaceTrees(ChunkOriginVoxel, ChunkSize, ChunkBiome, OutBlocks);
+		PlaceOres(ChunkOriginVoxel, ChunkSize, OutBlocks);
+	}
+
+	void FFeaturePlacer::PlaceTrees(const FIntVector& ChunkOriginVoxel, int ChunkSize, EBiome ChunkBiome, TArray<EBlock>& OutBlocks) const
+	{
 		// 不在沙漠 / 海洋种树
 		if (ChunkBiome == EBiome::Desert || ChunkBiome == EBiome::Ocean) return;
 
 		// 每 chunk 决定性 RNG（同一 worldSeed + chunk XY → 同一棵树布局）
 		uint64 Seed = HashCombine64(WorldSeed, static_cast<uint64>(static_cast<int64>(ChunkOriginVoxel.X)));
 		Seed = HashCombine64(Seed, static_cast<uint64>(static_cast<int64>(ChunkOriginVoxel.Y)));
+		Seed = HashKey(Seed, TEXT("trees"));
 		FRandomStream Rng(static_cast<int32>(Seed & 0x7fffffff));
 
 		// 树尝试次数（v1 简单分布；后续可按 placed_feature 的 weighted_list 配置）
@@ -90,15 +97,94 @@ namespace MCWorldGen
 
 			if (bUseOak)
 			{
-				// Oak 只在 grass / dirt 上长
 				if (TopBlock != EBlock::Grass && TopBlock != EBlock::Dirt) continue;
 				PlaceOak(rx, ry, topLz, ChunkSize, OutBlocks, Rng);
 			}
 			else if (bUseSpruce)
 			{
-				// Spruce 在 grass / dirt / snow 上长
 				if (TopBlock != EBlock::Grass && TopBlock != EBlock::Dirt && TopBlock != EBlock::Snow) continue;
 				PlaceSpruce(rx, ry, topLz, ChunkSize, OutBlocks, Rng);
+			}
+		}
+	}
+
+	void FFeaturePlacer::PlaceOres(const FIntVector& ChunkOriginVoxel, int ChunkSize, TArray<EBlock>& OutBlocks) const
+	{
+		// 矿种定义。Y 范围 + 分布 + 每 chunk 尝试次数 + blob 大小（小簇）。
+		struct FOreDef
+		{
+			EBlock Block;
+			int    YMin;       // 世界 Y
+			int    YMax;       // 世界 Y
+			bool   bTriangle;  // true → 中点处概率最高的三角分布；false → 区间内均匀
+			int    Count;      // 每 chunk 尝试次数
+			int    BlobMin;    // 簇最小块数
+			int    BlobMax;    // 簇最大块数
+		};
+		// Mojang ore_*：Coal 在 [0, 96] 均匀；Iron upper [80, 384] 梯形；Diamond [-64, 16] 三角
+		// （Mojang 的实际 count 是按 16x16 的 vanilla chunk 计的，我们的 chunk 是 32x32 = 4 倍面积，
+		// 但为了更易看到，先按 Mojang 的原始数字，不放大。）
+		static const FOreDef OreDefs[] = {
+			{ EBlock::CoalOre,    0,  96, false, 20, 4, 8 },
+			{ EBlock::IronOre,   80, 320, true,   4, 4, 9 },
+			{ EBlock::DiamondOre, -64, 16, true,   7, 4, 8 },
+		};
+
+		const int ChunkYMin = ChunkOriginVoxel.Z;
+		const int ChunkYMax = ChunkOriginVoxel.Z + ChunkSize - 1;
+
+		uint64 Seed = HashCombine64(WorldSeed, static_cast<uint64>(static_cast<int64>(ChunkOriginVoxel.X)));
+		Seed = HashCombine64(Seed, static_cast<uint64>(static_cast<int64>(ChunkOriginVoxel.Y)));
+		Seed = HashKey(Seed, TEXT("ores"));
+		FRandomStream Rng(static_cast<int32>(Seed & 0x7fffffff));
+
+		for (const FOreDef& Def : OreDefs)
+		{
+			// 跳过本 chunk 完全不在该矿 Y 范围里的情况
+			if (ChunkYMax < Def.YMin || ChunkYMin > Def.YMax) continue;
+
+			for (int i = 0; i < Def.Count; ++i)
+			{
+				// 选 (lx, ly) 任意位置
+				const int lx = Rng.RandRange(0, ChunkSize - 1);
+				const int ly = Rng.RandRange(0, ChunkSize - 1);
+
+				// Y 在分布上采样（世界坐标）
+				int worldY;
+				if (Def.bTriangle)
+				{
+					// 两个均匀变量平均 → 三角分布，峰值在 (YMin+YMax)/2
+					const float t = (Rng.FRand() + Rng.FRand()) * 0.5f;
+					worldY = Def.YMin + static_cast<int>(t * (Def.YMax - Def.YMin));
+				}
+				else
+				{
+					worldY = Rng.RandRange(Def.YMin, Def.YMax);
+				}
+
+				// 必须落在本 chunk 的 y 段内才放
+				if (worldY < ChunkYMin || worldY > ChunkYMax) continue;
+				const int lz = worldY - ChunkYMin;
+
+				// 中心必须是 stone
+				if (GetBlockAt(lx, ly, lz, ChunkSize, OutBlocks) != EBlock::Stone) continue;
+
+				// 撒一个小簇：在中心 ±1 的 3x3x3 立方里随机投 N 个块
+				const int BlobSize = Rng.RandRange(Def.BlobMin, Def.BlobMax);
+				for (int b = 0; b < BlobSize; ++b)
+				{
+					const int dx = Rng.RandRange(-1, 1);
+					const int dy = Rng.RandRange(-1, 1);
+					const int dz = Rng.RandRange(-1, 1);
+					const int bx = lx + dx;
+					const int by = ly + dy;
+					const int bz = lz + dz;
+					if (bx < 0 || bx >= ChunkSize || by < 0 || by >= ChunkSize || bz < 0 || bz >= ChunkSize) continue;
+					if (GetBlockAt(bx, by, bz, ChunkSize, OutBlocks) == EBlock::Stone)
+					{
+						SetBlockAt(bx, by, bz, ChunkSize, OutBlocks, Def.Block);
+					}
+				}
 			}
 		}
 	}
