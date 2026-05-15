@@ -39,6 +39,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "World")
 	int64 WorldSeed = 0;
 
+	// 是否生成 cheese 洞穴。关闭后地下不再有空腔（生成更快，便于 biome 验证）。
+	UPROPERTY(EditAnywhere, Category = "World")
+	bool bEnableCaves = true;
+
 	// 调试：开启后表层方块按 biome 着色（top + 几层全替换为该 biome 的"标记块"），
 	// 便于从空中肉眼验证 biome 分布。正常游玩时关掉。
 	UPROPERTY(EditAnywhere, Category = "Debug")

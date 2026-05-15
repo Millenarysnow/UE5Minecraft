@@ -40,7 +40,8 @@ namespace MCWorldGen
 		}
 	}
 
-	FNoiseRouter::FNoiseRouter(uint64 WorldSeed)
+	FNoiseRouter::FNoiseRouter(uint64 WorldSeed, bool bEnableCaves)
+		: bCavesEnabled(bEnableCaves)
 	{
 		auto MakeNoise = [WorldSeed](const FNoiseDef& Def) -> TSharedRef<const FNormalNoise>
 		{
@@ -53,6 +54,11 @@ namespace MCWorldGen
 		TempNoise      = MakeNoise(Noises::Temperature);
 		VegNoise       = MakeNoise(Noises::Vegetation);
 		JaggedNoise    = MakeNoise(Noises::Jagged);
+
+		if (bCavesEnabled)
+		{
+			CaveCheeseNoise = MakeNoise(Noises::CaveCheese);
+		}
 
 		// base_3d_noise 替代品：Mojang 用 BlendedNoise(0.25, 0.125, 80, 160, 8.0)，等效采样在
 		// 大约 (x*0.003125, y*0.000781, z*0.003125)。我们用一个 5 octave 的 NormalNoise 近似，
@@ -127,7 +133,23 @@ namespace MCWorldGen
 
 		const double SlopedCheese = SlopedNoBase + B3;
 
-		return ApplySlide(SlopedCheese, Wy);
+		double Density = SlopedCheese;
+
+		// Cheese 洞穴：Mojang underground.cheese 项的 v1 简化（不含 spaghetti / pillar / cave_layer）。
+		//   cheese_term = clamp(0.27 + cave_noise, -1, 1) + clamp(1.5 - 0.64·sloped_cheese, 0, 0.5)
+		// 第二项在表层附近常驻 0.5 防止洞被挖到地表，深处 → 0 才允许 cave_noise 主导。
+		// final = min(sloped_cheese, cheese_term)：cheese_term < 0 时挖空。
+		if (bCavesEnabled && CaveCheeseNoise.IsValid())
+		{
+			// Mojang noise(CAVE_CHEESE, 0.6666...) 表示 xz_scale=1, y_scale=0.6666 → y 方向稍稍拉伸。
+			const double CaveNoise = CaveCheeseNoise->Sample(Col.Wx * 1.0, Wy * 0.6666666666666666, Col.Wz * 1.0);
+			const double CheesePart1 = FMath::Clamp(0.27 + CaveNoise, -1.0, 1.0);
+			const double CheesePart2 = FMath::Clamp(1.5 - 0.64 * SlopedCheese, 0.0, 0.5);
+			const double CheeseTerm  = CheesePart1 + CheesePart2;
+			Density = FMath::Min(Density, CheeseTerm);
+		}
+
+		return ApplySlide(Density, Wy);
 	}
 
 	double FNoiseRouter::FinalDensity(double Wx, double Wy, double Wz) const

@@ -29,6 +29,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "WorldGen")
 	int64 WorldSeed = 0;
 
+	// 由 MyGameMode 传入。
+	bool bEnableCaves = true;
+
 	// 调试：开启后表层方块按 biome 着色。由 MyGameMode 在 BeginPlay 设置。
 	bool bDebugBiomeColors = false;
 

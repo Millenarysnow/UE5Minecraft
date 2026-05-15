@@ -16,7 +16,7 @@ void UWorldGenerator::EnsureRouter()
 {
 	if (!Router.IsValid() || RouterSeed != WorldSeed)
 	{
-		Router = MakeUnique<FNoiseRouter>(static_cast<uint64>(WorldSeed));
+		Router = MakeUnique<FNoiseRouter>(static_cast<uint64>(WorldSeed), bEnableCaves);
 		SurfaceSystem = MakeUnique<MCWorldGen::FSurfaceSystem>(static_cast<uint64>(WorldSeed));
 		BiomeSource = MakeUnique<MCWorldGen::FBiomeSource>();
 		RouterSeed = WorldSeed;
@@ -73,9 +73,11 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 
 			// Pass 1：density → 主体方块（stone / water / air / bedrock）。
 			// 快速路径：本 chunk 完全在 stone 或 air 一侧 → 跳过逐 y 评估。
-			if (ChunkYMax <= Bounds.StoneYMax)
+			// 注意：当 caves 启用时，"全 stone" 不再安全（cheese 洞会挖空地下），所以只对 air 走 fast path。
+			const bool bCanFastStone = !Router->AreCavesEnabled();
+			if (bCanFastStone && ChunkYMax <= Bounds.StoneYMax)
 			{
-				// 全 stone。
+				// 全 stone（无 caves 模式下安全）。
 				for (int lz = 0; lz < ChunkSize; ++lz)
 				{
 					const int worldUEz = ChunkYMin + lz;
@@ -84,7 +86,7 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 			}
 			else if (ChunkYMin >= Bounds.AirYMin)
 			{
-				// 全 air / water（依 y 跟 sea level 比）。
+				// 全 air / water（依 y 跟 sea level 比）。caves 不影响 air 区。
 				for (int lz = 0; lz < ChunkSize; ++lz)
 				{
 					const int worldUEz = ChunkYMin + lz;
@@ -123,7 +125,7 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 			// 多采样一次"本 chunk 顶面再上一格"的密度，让表层判断能够覆盖 lz=ChunkSize-1 是 stone 的边界 case。
 			const int AboveChunkUEz = ChunkOriginWorldVoxel.Z + ChunkSize;
 			EBlock BlockAbove;
-			if (AboveChunkUEz <= Bounds.StoneYMax)
+			if (bCanFastStone && AboveChunkUEz <= Bounds.StoneYMax)
 			{
 				BlockAbove = EBlock::Stone;
 			}

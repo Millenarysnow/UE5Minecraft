@@ -27,6 +27,7 @@ void AMyGameModeBase::BeginPlay()
 	if (WorldGen)
 	{
 		WorldGen->WorldSeed = EffectiveSeed;
+		WorldGen->bEnableCaves = bEnableCaves;
 		WorldGen->bDebugBiomeColors = bDebugBiomeColors;
 	}
 
