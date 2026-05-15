@@ -71,10 +71,52 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 				0.0
 			);
 
+			// 先确定本 chunk 顶部 (lz=ChunkSize) 上方一格的方块 + 状态机初始位（"是否已经在 stone 之下"），
+			// 用于 Pass 1 的自上而下扫描判断 "air-density 方块该判为 cave Air 还是 sea Water"。
+			const int AboveChunkUEz = ChunkOriginWorldVoxel.Z + ChunkSize;
+			const double EstimatedSurface = static_cast<double>(FNoiseRouter::MinY) + 128.0 * (1.5 + Col.Offset);
+			const bool bCanFastStone = !Router->AreCavesEnabled();
+
+			EBlock BlockAbove;
+			bool bSeenStoneInit; // Pass 1 状态机初始值
+			if (bCanFastStone && AboveChunkUEz <= Bounds.StoneYMax)
+			{
+				BlockAbove = EBlock::Stone;
+				bSeenStoneInit = true;
+			}
+			else if (AboveChunkUEz >= Bounds.AirYMin)
+			{
+				BlockAbove = (AboveChunkUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
+				bSeenStoneInit = false;
+			}
+			else
+			{
+				const double AboveDensity = Router->DensityInColumn(Col, static_cast<double>(AboveChunkUEz));
+				if (AboveDensity > 0.0)
+				{
+					BlockAbove = EBlock::Stone;
+					bSeenStoneInit = true;
+				}
+				else
+				{
+					// density ≤ 0 但不一定是天空：可能是地下洞穴。用 offset 估算的 surface 区分。
+					const bool bAboveIsUnderground = (static_cast<double>(AboveChunkUEz) < EstimatedSurface - 30.0);
+					if (bAboveIsUnderground)
+					{
+						BlockAbove = EBlock::Air; // 洞穴内
+						bSeenStoneInit = true;
+					}
+					else
+					{
+						BlockAbove = (AboveChunkUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
+						bSeenStoneInit = false;
+					}
+				}
+			}
+
 			// Pass 1：density → 主体方块（stone / water / air / bedrock）。
 			// 快速路径：本 chunk 完全在 stone 或 air 一侧 → 跳过逐 y 评估。
 			// 注意：当 caves 启用时，"全 stone" 不再安全（cheese 洞会挖空地下），所以只对 air 走 fast path。
-			const bool bCanFastStone = !Router->AreCavesEnabled();
 			if (bCanFastStone && ChunkYMax <= Bounds.StoneYMax)
 			{
 				// 全 stone（无 caves 模式下安全）。
@@ -95,8 +137,9 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 			}
 			else
 			{
-				// 跨越过渡区域：逐 y 评估密度。
-				for (int lz = 0; lz < ChunkSize; ++lz)
+				// 跨越过渡区域：自上而下逐 y 评估密度。带状态机区分 sea Water / cave Air。
+				bool bSeenStone = bSeenStoneInit;
+				for (int lz = ChunkSize - 1; lz >= 0; --lz)
 				{
 					const int worldUEz = ChunkYMin + lz; // UE.Z = MC.Y
 					const double McY = static_cast<double>(worldUEz);
@@ -107,13 +150,21 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 					if (worldUEz == FNoiseRouter::MinY)
 					{
 						Block = EBlock::Bedrock;
+						bSeenStone = true;
 					}
 					else if (Density > 0.0)
 					{
 						Block = EBlock::Stone;
+						bSeenStone = true;
+					}
+					else if (bSeenStone)
+					{
+						// 已经在 stone 之下：低密度方块 = 洞穴空腔，永远 Air（不论 y）。
+						Block = EBlock::Air;
 					}
 					else
 					{
+						// 还没碰到 stone：处在世界表面之上，按 sea level 决定 sea Water / 天空 Air。
 						Block = (worldUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
 					}
 
@@ -121,26 +172,12 @@ void UWorldGenerator::FillChunk(const FIntVector& ChunkOriginWorldVoxel, int Chu
 				}
 			}
 
-			// Pass 2：表层规则（grass / dirt / sand 替换最顶层 stone）。
-			// 多采样一次"本 chunk 顶面再上一格"的密度，让表层判断能够覆盖 lz=ChunkSize-1 是 stone 的边界 case。
-			const int AboveChunkUEz = ChunkOriginWorldVoxel.Z + ChunkSize;
-			EBlock BlockAbove;
-			if (bCanFastStone && AboveChunkUEz <= Bounds.StoneYMax)
+			// Pass 2：表层规则（grass / dirt / sand 替换最顶层 stone）。BlockAbove 已经在上面算过了。
+			// 仅当本 chunk 不是"完全在 stone 之下"时才应用 —— 否则会把洞穴顶误判成世界表面糊草。
+			if (!bSeenStoneInit)
 			{
-				BlockAbove = EBlock::Stone;
+				SurfaceSystem->ApplyColumn(McX, McZ, ChunkOriginWorldVoxel.Z, Biome, BlockAbove, bDebugBiomeColors, Column);
 			}
-			else if (AboveChunkUEz >= Bounds.AirYMin)
-			{
-				BlockAbove = (AboveChunkUEz <= FNoiseRouter::SeaLevel) ? EBlock::Water : EBlock::Air;
-			}
-			else
-			{
-				const double AboveDensity = Router->DensityInColumn(Col, static_cast<double>(AboveChunkUEz));
-				if (AboveDensity > 0.0)                                    BlockAbove = EBlock::Stone;
-				else if (AboveChunkUEz <= FNoiseRouter::SeaLevel)          BlockAbove = EBlock::Water;
-				else                                                        BlockAbove = EBlock::Air;
-			}
-			SurfaceSystem->ApplyColumn(McX, McZ, ChunkOriginWorldVoxel.Z, Biome, BlockAbove, bDebugBiomeColors, Column);
 
 			// 写回三维 OutBlocks。
 			for (int lz = 0; lz < ChunkSize; ++lz)
